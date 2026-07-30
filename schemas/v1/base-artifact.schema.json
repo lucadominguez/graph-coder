@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://graph-coder.local/schemas/base-artifact.schema.json",
+  "$defs": {
+    "artifactBase": {
+      "type": "object",
+      "required": ["artifact_contract", "artifact_type", "id", "version"],
+      "properties": {
+        "artifact_contract": {"const": "agent-planning-system/v1"},
+        "artifact_type": {"type": "string"},
+        "id": {"type": "string", "minLength": 1},
+        "version": {"type": "integer", "minimum": 1}
+      }
+    },
+    "nonEmptyStringArray": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "minItems": 1,
+      "uniqueItems": true
+    }
+  }
+}

@@ -1,0 +1,11 @@
+# Graph Coder is developed on Windows and Linux. Normalize everything to LF in
+# the repository so artifact hashes and schema fixtures stay stable across hosts.
+* text=auto eol=lf
+
+*.ps1 text eol=crlf
+
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
+*.db binary

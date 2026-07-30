@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://graph-coder.local/schemas/worker-report.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_contract", "artifact_type", "id", "version", "plan_id", "plan_version",
+    "graph_id", "graph_version", "node_id", "unit_id", "attempt", "status", "summary",
+    "files_changed", "commands", "artifacts", "decisions", "deviations", "evidence",
+    "suggested_next_action"
+  ],
+  "properties": {
+    "artifact_contract": {"const": "agent-planning-system/v1"},
+    "artifact_type": {"const": "worker_report"},
+    "id": {"type": "string", "minLength": 1},
+    "version": {"type": "integer", "minimum": 1},
+    "plan_id": {"type": "string", "pattern": "^P-"},
+    "plan_version": {"type": "integer", "minimum": 1},
+    "graph_id": {"type": "string", "minLength": 1},
+    "graph_version": {"type": "integer", "minimum": 1},
+    "node_id": {"type": "string", "minLength": 1},
+    "unit_id": {"type": "string", "pattern": "^U-"},
+    "attempt": {"type": "integer", "minimum": 1},
+    "status": {"enum": ["completed", "blocked", "failed", "partial"]},
+    "summary": {"type": "string", "minLength": 1},
+    "files_changed": {"type": "array", "items": {"type": "string"}},
+    "commands": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["command", "exit_code"],
+        "properties": {
+          "command": {"type": "string"},
+          "exit_code": {"type": "integer"},
+          "result": {"type": "string"}
+        }
+      }
+    },
+    "artifacts": {"type": "array", "items": {"type": "object"}},
+    "decisions": {"type": "array", "items": {"type": "string"}},
+    "deviations": {"type": "array", "items": {"type": "string"}},
+    "evidence": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+    "blocker": {"type": ["string", "null"]},
+    "suggested_next_action": {"type": "string", "minLength": 1}
+  }
+}

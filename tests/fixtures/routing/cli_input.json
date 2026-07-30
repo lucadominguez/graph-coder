@@ -1,0 +1,32 @@
+{
+  "plan_id": "P-demo",
+  "unit_id": "U-demo",
+  "task": {
+    "task_id": "U-demo",
+    "benchmark_weights": {"coding": 1.0},
+    "max_per_attempt_cost": 1.0,
+    "quality_floor": 0.1,
+    "prefer_open_weight": true
+  },
+  "models": [
+    {
+      "model_id": "open/test",
+      "provider_id": "provider-a",
+      "context_tokens": 100000,
+      "output_tokens": 10000,
+      "per_attempt_cost": 0.01,
+      "confidence": 0.9,
+      "latency_ms": 50,
+      "open_weight": true,
+      "benchmarks": {"coding": 0.9},
+      "evidence_age_hours": 1.0
+    }
+  ],
+  "providers": [
+    {
+      "provider_id": "provider-a",
+      "authenticated": true,
+      "reliability": 0.99
+    }
+  ]
+}

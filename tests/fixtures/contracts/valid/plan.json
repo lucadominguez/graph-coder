@@ -1,0 +1,61 @@
+{
+  "artifact_contract": "agent-planning-system/v1",
+  "artifact_type": "plan",
+  "id": "P-demo",
+  "version": 1,
+  "content_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+  "metadata": {
+    "artifact_readiness": "implementation-ready",
+    "plan_id": "P-demo",
+    "plan_version": 1,
+    "planned_at_commit": "abc123",
+    "primary_planning_model": "planner-primary",
+    "planning_model_receipt": "verified",
+    "approved": false,
+    "release_gate": {}
+  },
+  "requirements": [
+    {"requirement_id": "R-001", "description": "Do work", "unit_ids": ["U-001"]}
+  ],
+  "acceptance_examples": [
+    {"example_id": "AE-001", "description": "Work passes", "unit_ids": ["U-001"]}
+  ],
+  "invariants": [
+    {"invariant_id": "I-001", "description": "Preserve behavior", "unit_ids": ["U-001"]}
+  ],
+  "units": [
+    {
+      "unit_id": "U-001",
+      "title": "Do work",
+      "objective": "Do work",
+      "acceptance": ["passes"],
+      "requirement_ids": ["R-001"],
+      "acceptance_example_ids": ["AE-001"],
+      "rationale": "Required",
+      "dependencies": [],
+      "input_artifacts": ["plan"],
+      "inspect_targets": ["src/x.py"],
+      "read_scope": ["src"],
+      "write_scope": ["src/x.py"],
+      "forbidden_scope": ["secrets"],
+      "interfaces": ["x"],
+      "procedure": ["implement"],
+      "forward_proof": ["focused test"],
+      "regression_proof": ["full test"],
+      "commands": ["python -m pytest"],
+      "output_artifacts": ["report"],
+      "risk": "medium",
+      "complexity": "low",
+      "capability_profile": {},
+      "primary_route": null,
+      "fallback_route": null,
+      "attempt_limit": 2,
+      "escalation_conditions": ["contract conflict"],
+      "reviewer": "reviewer",
+      "stop_conditions": ["destructive action"],
+      "completion_evidence": ["test output"],
+      "status": "pending",
+      "semantic_hash": "U-000000000000000000000000"
+    }
+  ]
+}

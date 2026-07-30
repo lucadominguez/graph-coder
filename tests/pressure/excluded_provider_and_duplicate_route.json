@@ -1,0 +1,1 @@
+{"id":"excluded_provider_and_duplicate_route","design_list":"Graph Coder routing reliability pressure scenario","expect":["hard-filter excluded provider","prefer eligible direct subscription","reject duplicate paid OpenRouter route","record fallback evidence and cumulative cost"]}

@@ -1,0 +1,487 @@
+[
+  {
+    "aps": ".env.example",
+    "graph_coder": ".env.example",
+    "class": "ported"
+  },
+  {
+    "aps": ".gitignore",
+    "graph_coder": ".gitignore",
+    "class": "ported"
+  },
+  {
+    "aps": "LICENSE",
+    "graph_coder": "LICENSE",
+    "class": "adapted"
+  },
+  {
+    "aps": "README.md",
+    "graph_coder": "README.md",
+    "class": "adapted"
+  },
+  {
+    "aps": "docs/architecture.md",
+    "graph_coder": "docs/architecture.md",
+    "class": "adapted"
+  },
+  {
+    "aps": "docs/design-contract.md",
+    "graph_coder": "docs/design-contract.md",
+    "class": "adapted"
+  },
+  {
+    "aps": "docs/installation.md",
+    "graph_coder": "docs/installation.md",
+    "class": "adapted"
+  },
+  {
+    "aps": "docs/skills.md",
+    "graph_coder": "docs/skills.md",
+    "class": "adapted"
+  },
+  {
+    "aps": "docs/sources/agent-skills-conventions.md",
+    "graph_coder": "docs/sources/agent-skills-conventions.md",
+    "class": "ported"
+  },
+  {
+    "aps": "docs/superpowers/operator-terminal.md",
+    "graph_coder": "docs/superpowers/operator-terminal.md",
+    "class": "adapted"
+  },
+  {
+    "aps": "pyproject.toml",
+    "graph_coder": "pyproject.toml",
+    "class": "adapted"
+  },
+  {
+    "aps": "schemas/base-artifact.schema.json",
+    "graph_coder": "schemas/import/aps-v1/base-artifact.schema.json",
+    "class": "ported"
+  },
+  {
+    "aps": "schemas/event.schema.json",
+    "graph_coder": "schemas/import/aps-v1/event.schema.json",
+    "class": "ported"
+  },
+  {
+    "aps": "schemas/graph.schema.json",
+    "graph_coder": "schemas/import/aps-v1/graph.schema.json",
+    "class": "ported"
+  },
+  {
+    "aps": "schemas/manager_advice.schema.json",
+    "graph_coder": "schemas/import/aps-v1/manager_advice.schema.json",
+    "class": "ported"
+  },
+  {
+    "aps": "schemas/plan.schema.json",
+    "graph_coder": "schemas/import/aps-v1/plan.schema.json",
+    "class": "ported"
+  },
+  {
+    "aps": "schemas/review_defect.schema.json",
+    "graph_coder": "schemas/import/aps-v1/review_defect.schema.json",
+    "class": "ported"
+  },
+  {
+    "aps": "schemas/task_packet.schema.json",
+    "graph_coder": "schemas/import/aps-v1/task_packet.schema.json",
+    "class": "ported"
+  },
+  {
+    "aps": "schemas/worker_report.schema.json",
+    "graph_coder": "schemas/import/aps-v1/worker_report.schema.json",
+    "class": "ported"
+  },
+  {
+    "aps": "schemas/base-artifact.schema.json",
+    "graph_coder": "schemas/v1/base-artifact.schema.json",
+    "class": "adapted"
+  },
+  {
+    "aps": "schemas/event.schema.json",
+    "graph_coder": "schemas/v1/event.schema.json",
+    "class": "adapted"
+  },
+  {
+    "aps": "schemas/graph.schema.json",
+    "graph_coder": "schemas/v1/graph.schema.json",
+    "class": "adapted"
+  },
+  {
+    "aps": "schemas/manager_advice.schema.json",
+    "graph_coder": "schemas/v1/manager_advice.schema.json",
+    "class": "adapted"
+  },
+  {
+    "aps": "schemas/plan.schema.json",
+    "graph_coder": "schemas/v1/plan.schema.json",
+    "class": "adapted"
+  },
+  {
+    "aps": "schemas/review_defect.schema.json",
+    "graph_coder": "schemas/v1/review_defect.schema.json",
+    "class": "adapted"
+  },
+  {
+    "aps": "schemas/task_packet.schema.json",
+    "graph_coder": "schemas/v1/task_packet.schema.json",
+    "class": "adapted"
+  },
+  {
+    "aps": "schemas/worker_report.schema.json",
+    "graph_coder": "schemas/v1/worker_report.schema.json",
+    "class": "adapted"
+  },
+  {
+    "aps": "scripts/aps-terminal-helper.ps1",
+    "graph_coder": "scripts/graph-coder-terminal-helper.ps1",
+    "class": "ported"
+  },
+  {
+    "aps": "scripts/aps-terminal-helper.sh",
+    "graph_coder": "scripts/graph-coder-terminal-helper.sh",
+    "class": "ported"
+  },
+  {
+    "aps": "scripts/install.ps1",
+    "graph_coder": "scripts/install.ps1",
+    "class": "adapted"
+  },
+  {
+    "aps": "scripts/install.sh",
+    "graph_coder": "scripts/install.sh",
+    "class": "adapted"
+  },
+  {
+    "aps": "skills/delegation-graph/SKILL.md",
+    "graph_coder": "skills/delegation-graph/SKILL.md",
+    "class": "ported"
+  },
+  {
+    "aps": "skills/execution-manager/SKILL.md",
+    "graph_coder": "skills/execution-manager/SKILL.md",
+    "class": "adapted"
+  },
+  {
+    "aps": "skills/plan-forge/SKILL.md",
+    "graph_coder": "skills/plan-forge/SKILL.md",
+    "class": "adapted"
+  },
+  {
+    "aps": "skills/plan-rehearsal/SKILL.md",
+    "graph_coder": "skills/plan-rehearsal/SKILL.md",
+    "class": "ported"
+  },
+  {
+    "aps": "skills/routing-plan/SKILL.md",
+    "graph_coder": "skills/routing-plan/SKILL.md",
+    "class": "adapted"
+  },
+  {
+    "aps": "skills/routing-plan/scripts/llm_stats.py",
+    "graph_coder": "skills/routing-plan/scripts/llm_stats.py",
+    "class": "adapted"
+  },
+  {
+    "aps": "src/agent_planning_system/__init__.py",
+    "graph_coder": "src/graph_coder/__init__.py",
+    "class": "adapted"
+  },
+  {
+    "aps": "src/agent_planning_system/__main__.py",
+    "graph_coder": "src/graph_coder/__main__.py",
+    "class": "adapted"
+  },
+  {
+    "aps": "src/agent_planning_system/adapters/__init__.py",
+    "graph_coder": "src/graph_coder/adapters/__init__.py",
+    "class": "adapted"
+  },
+  {
+    "aps": "src/agent_planning_system/adapters/jcode.py",
+    "graph_coder": "src/graph_coder/adapters/jcode.py",
+    "class": "adapted"
+  },
+  {
+    "aps": "src/agent_planning_system/cli.py",
+    "graph_coder": "src/graph_coder/cli.py",
+    "class": "adapted"
+  },
+  {
+    "aps": "src/agent_planning_system/config.py",
+    "graph_coder": "src/graph_coder/config.py",
+    "class": "adapted"
+  },
+  {
+    "aps": "src/agent_planning_system/context.py",
+    "graph_coder": "src/graph_coder/context.py",
+    "class": "ported"
+  },
+  {
+    "aps": "src/agent_planning_system/contracts.py",
+    "graph_coder": "src/graph_coder/contracts.py",
+    "class": "adapted"
+  },
+  {
+    "aps": "src/agent_planning_system/db.py",
+    "graph_coder": "src/graph_coder/db.py",
+    "class": "adapted"
+  },
+  {
+    "aps": "src/agent_planning_system/errors.py",
+    "graph_coder": "src/graph_coder/errors.py",
+    "class": "adapted"
+  },
+  {
+    "aps": "src/agent_planning_system/events.py",
+    "graph_coder": "src/graph_coder/events.py",
+    "class": "adapted"
+  },
+  {
+    "aps": "src/agent_planning_system/graph.py",
+    "graph_coder": "src/graph_coder/graph.py",
+    "class": "adapted"
+  },
+  {
+    "aps": "src/agent_planning_system/llm_stats.py",
+    "graph_coder": "src/graph_coder/llm_stats.py",
+    "class": "ported"
+  },
+  {
+    "aps": "src/agent_planning_system/plans.py",
+    "graph_coder": "src/graph_coder/plans.py",
+    "class": "adapted"
+  },
+  {
+    "aps": "src/agent_planning_system/py.typed",
+    "graph_coder": "src/graph_coder/py.typed",
+    "class": "ported"
+  },
+  {
+    "aps": "src/agent_planning_system/recovery.py",
+    "graph_coder": "src/graph_coder/recovery.py",
+    "class": "ported"
+  },
+  {
+    "aps": "src/agent_planning_system/redaction.py",
+    "graph_coder": "src/graph_coder/redaction.py",
+    "class": "ported"
+  },
+  {
+    "aps": "src/agent_planning_system/routing.py",
+    "graph_coder": "src/graph_coder/routing.py",
+    "class": "adapted"
+  },
+  {
+    "aps": "src/agent_planning_system/terminal.py",
+    "graph_coder": "src/graph_coder/terminal.py",
+    "class": "adapted"
+  },
+  {
+    "aps": "tests/fixtures/contracts/invalid/plan_bad_contract.json",
+    "graph_coder": "tests/fixtures/contracts/invalid/plan_bad_contract.json",
+    "class": "ported"
+  },
+  {
+    "aps": "tests/fixtures/contracts/valid/plan.json",
+    "graph_coder": "tests/fixtures/contracts/valid/plan.json",
+    "class": "adapted"
+  },
+  {
+    "aps": "tests/fixtures/jcode/version.txt",
+    "graph_coder": "tests/fixtures/jcode/version.txt",
+    "class": "ported"
+  },
+  {
+    "aps": "tests/fixtures/plans/invalid_plan.md",
+    "graph_coder": "tests/fixtures/plans/invalid_plan.md",
+    "class": "ported"
+  },
+  {
+    "aps": "tests/fixtures/plans/valid_plan.md",
+    "graph_coder": "tests/fixtures/plans/valid_plan.md",
+    "class": "adapted"
+  },
+  {
+    "aps": "tests/fixtures/routing/cli_input.json",
+    "graph_coder": "tests/fixtures/routing/cli_input.json",
+    "class": "ported"
+  },
+  {
+    "aps": "tests/fixtures/routing/golden.json",
+    "graph_coder": "tests/fixtures/routing/golden.json",
+    "class": "ported"
+  },
+  {
+    "aps": "tests/pressure/README.md",
+    "graph_coder": "tests/pressure/README.md",
+    "class": "adapted"
+  },
+  {
+    "aps": "tests/pressure/ambiguous_product_intent.json",
+    "graph_coder": "tests/pressure/ambiguous_product_intent.json",
+    "class": "adapted"
+  },
+  {
+    "aps": "tests/pressure/approval_after_material_revision.json",
+    "graph_coder": "tests/pressure/approval_after_material_revision.json",
+    "class": "adapted"
+  },
+  {
+    "aps": "tests/pressure/built_in_plan_shadowing.json",
+    "graph_coder": "tests/pressure/built_in_plan_shadowing.json",
+    "class": "adapted"
+  },
+  {
+    "aps": "tests/pressure/cycle_in_delegation_graph.json",
+    "graph_coder": "tests/pressure/cycle_in_delegation_graph.json",
+    "class": "adapted"
+  },
+  {
+    "aps": "tests/pressure/destructive_migration_request.json",
+    "graph_coder": "tests/pressure/destructive_migration_request.json",
+    "class": "adapted"
+  },
+  {
+    "aps": "tests/pressure/excluded_provider_and_duplicate_route.json",
+    "graph_coder": "tests/pressure/excluded_provider_and_duplicate_route.json",
+    "class": "adapted"
+  },
+  {
+    "aps": "tests/pressure/manager_attempts_to_execute.json",
+    "graph_coder": "tests/pressure/manager_attempts_to_execute.json",
+    "class": "adapted"
+  },
+  {
+    "aps": "tests/pressure/missing_acceptance_checks.json",
+    "graph_coder": "tests/pressure/missing_acceptance_checks.json",
+    "class": "adapted"
+  },
+  {
+    "aps": "tests/pressure/parallel_file_conflict.json",
+    "graph_coder": "tests/pressure/parallel_file_conflict.json",
+    "class": "adapted"
+  },
+  {
+    "aps": "tests/pressure/reload_with_unknown_workers.json",
+    "graph_coder": "tests/pressure/reload_with_unknown_workers.json",
+    "class": "adapted"
+  },
+  {
+    "aps": "tests/pressure/resume_after_partial_failure.json",
+    "graph_coder": "tests/pressure/resume_after_partial_failure.json",
+    "class": "adapted"
+  },
+  {
+    "aps": "tests/pressure/route_requires_external_capability.json",
+    "graph_coder": "tests/pressure/route_requires_external_capability.json",
+    "class": "adapted"
+  },
+  {
+    "aps": "tests/pressure/secret_handling_pressure.json",
+    "graph_coder": "tests/pressure/secret_handling_pressure.json",
+    "class": "adapted"
+  },
+  {
+    "aps": "tests/pressure/sidepanel_over_30_workers.json",
+    "graph_coder": "tests/pressure/sidepanel_over_30_workers.json",
+    "class": "adapted"
+  },
+  {
+    "aps": "tests/pressure/truncated_rehearsal_report.json",
+    "graph_coder": "tests/pressure/truncated_rehearsal_report.json",
+    "class": "adapted"
+  },
+  {
+    "aps": "tests/pressure/windows_terminal_no_komorebi.json",
+    "graph_coder": "tests/pressure/windows_terminal_no_komorebi.json",
+    "class": "adapted"
+  },
+  {
+    "aps": "tests/test_cli.py",
+    "graph_coder": "tests/test_cli.py",
+    "class": "adapted"
+  },
+  {
+    "aps": "tests/test_config.py",
+    "graph_coder": "tests/test_config.py",
+    "class": "adapted"
+  },
+  {
+    "aps": "tests/test_context.py",
+    "graph_coder": "tests/test_context.py",
+    "class": "adapted"
+  },
+  {
+    "aps": "tests/test_contracts.py",
+    "graph_coder": "tests/test_contracts.py",
+    "class": "adapted"
+  },
+  {
+    "aps": "tests/test_db.py",
+    "graph_coder": "tests/test_db.py",
+    "class": "adapted"
+  },
+  {
+    "aps": "tests/test_events.py",
+    "graph_coder": "tests/test_events.py",
+    "class": "adapted"
+  },
+  {
+    "aps": "tests/test_graph.py",
+    "graph_coder": "tests/test_graph.py",
+    "class": "adapted"
+  },
+  {
+    "aps": "tests/test_installers.py",
+    "graph_coder": "tests/test_installers.py",
+    "class": "adapted"
+  },
+  {
+    "aps": "tests/test_jcode_adapter.py",
+    "graph_coder": "tests/test_jcode_adapter.py",
+    "class": "adapted"
+  },
+  {
+    "aps": "tests/test_llm_stats.py",
+    "graph_coder": "tests/test_llm_stats.py",
+    "class": "adapted"
+  },
+  {
+    "aps": "tests/test_plans.py",
+    "graph_coder": "tests/test_plans.py",
+    "class": "adapted"
+  },
+  {
+    "aps": "tests/test_recovery.py",
+    "graph_coder": "tests/test_recovery.py",
+    "class": "adapted"
+  },
+  {
+    "aps": "tests/test_redaction.py",
+    "graph_coder": "tests/test_redaction.py",
+    "class": "adapted"
+  },
+  {
+    "aps": "tests/test_routing.py",
+    "graph_coder": "tests/test_routing.py",
+    "class": "adapted"
+  },
+  {
+    "aps": "tests/test_session_reliability.py",
+    "graph_coder": "tests/test_session_reliability.py",
+    "class": "ported"
+  },
+  {
+    "aps": "tests/test_skill_contracts.py",
+    "graph_coder": "tests/test_skill_contracts.py",
+    "class": "ported"
+  },
+  {
+    "aps": "tests/test_terminal.py",
+    "graph_coder": "tests/test_terminal.py",
+    "class": "adapted"
+  }
+]

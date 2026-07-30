@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-planning-system.local/schemas/event.schema.json",
+  "type": "object", "additionalProperties": false,
+  "required": ["artifact_contract", "artifact_type", "id", "version", "sequence", "prior_hash", "event_hash", "event_type", "timestamp_utc", "actor_role", "payload", "artifact_hashes"],
+  "properties": {
+    "artifact_contract": {"const": "agent-planning-system/v1"}, "artifact_type": {"const": "event"}, "id": {"type": "string", "minLength": 1}, "version": {"type": "integer", "minimum": 1}, "sequence": {"type": "integer", "minimum": 1},
+    "prior_hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "event_hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "run_id": {"type": ["string", "null"]}, "plan_id": {"type": ["string", "null"]}, "node_id": {"type": ["string", "null"]}, "unit_id": {"type": ["string", "null"]}, "attempt_id": {"type": ["string", "null"]},
+    "actor_role": {"type": "string", "minLength": 1}, "model_receipt": {"type": ["string", "null"]}, "event_type": {"type": "string", "minLength": 1}, "timestamp_utc": {"type": "string", "format": "date-time"}, "repository_commit": {"type": ["string", "null"]}, "worktree": {"type": ["string", "null"]}, "payload": {"type": "object"}, "artifact_hashes": {"type": "array", "items": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}, "idempotency_key": {"type": ["string", "null"]}
+  }
+}

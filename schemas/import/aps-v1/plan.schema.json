@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-planning-system.local/schemas/plan.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["artifact_contract", "artifact_type", "id", "version", "content_hash", "metadata", "requirements", "acceptance_examples", "invariants", "units"],
+  "properties": {
+    "artifact_contract": {"const": "agent-planning-system/v1"},
+    "artifact_type": {"const": "plan"},
+    "id": {"type": "string", "pattern": "^P-[A-Za-z0-9][A-Za-z0-9._-]*$"},
+    "version": {"type": "integer", "minimum": 1},
+    "content_hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "metadata": {
+      "type": "object",
+      "required": ["artifact_readiness", "plan_id", "plan_version", "planned_at_commit", "primary_planning_model", "planning_model_receipt", "approved"],
+      "properties": {
+        "artifact_readiness": {"enum": ["requirements-ready", "implementation-ready"]},
+        "plan_id": {"type": "string", "pattern": "^P-"},
+        "plan_version": {"type": "integer", "minimum": 1},
+        "planned_at_commit": {"type": "string", "minLength": 1},
+        "primary_planning_model": {"type": "string", "minLength": 1},
+        "planning_model_receipt": {"enum": ["verified", "unverified"]},
+        "approved": {"type": "boolean"},
+        "release_gate": {"type": "object"}
+      }
+    },
+    "requirements": {"type": "array", "items": {"$ref": "#/$defs/requirement"}, "uniqueItems": true},
+    "acceptance_examples": {"type": "array", "items": {"$ref": "#/$defs/acceptanceExample"}, "uniqueItems": true},
+    "invariants": {"type": "array", "items": {"$ref": "#/$defs/invariant"}, "uniqueItems": true},
+    "units": {"type": "array", "items": {"$ref": "#/$defs/unit"}, "uniqueItems": true}
+  },
+  "$defs": {
+    "nonEmptyStrings": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1, "uniqueItems": true},
+    "requirement": {
+      "type": "object", "additionalProperties": false,
+      "required": ["requirement_id", "description", "unit_ids"],
+      "properties": {"requirement_id": {"type": "string", "pattern": "^R-"}, "description": {"type": "string", "minLength": 1}, "unit_ids": {"$ref": "#/$defs/nonEmptyStrings"}}
+    },
+    "acceptanceExample": {
+      "type": "object", "additionalProperties": false,
+      "required": ["example_id", "description", "unit_ids"],
+      "properties": {"example_id": {"type": "string", "pattern": "^AE-"}, "description": {"type": "string", "minLength": 1}, "unit_ids": {"$ref": "#/$defs/nonEmptyStrings"}}
+    },
+    "invariant": {
+      "type": "object", "additionalProperties": false,
+      "required": ["invariant_id", "description", "unit_ids"],
+      "properties": {"invariant_id": {"type": "string", "pattern": "^I-"}, "description": {"type": "string", "minLength": 1}, "unit_ids": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true}}
+    },
+    "unit": {
+      "type": "object", "additionalProperties": false,
+      "required": ["unit_id", "title", "objective", "acceptance", "requirement_ids", "acceptance_example_ids", "dependencies", "input_artifacts", "inspect_targets", "read_scope", "write_scope", "forbidden_scope", "interfaces", "procedure", "forward_proof", "regression_proof", "commands", "output_artifacts", "risk", "complexity", "capability_profile", "attempt_limit", "escalation_conditions", "reviewer", "stop_conditions", "completion_evidence", "status", "semantic_hash"],
+      "properties": {
+        "unit_id": {"type": "string", "pattern": "^U-"}, "title": {"type": "string", "minLength": 1}, "objective": {"type": "string", "minLength": 1},
+        "acceptance": {"$ref": "#/$defs/nonEmptyStrings"}, "requirement_ids": {"$ref": "#/$defs/nonEmptyStrings"}, "acceptance_example_ids": {"$ref": "#/$defs/nonEmptyStrings"},
+        "rationale": {"type": "string"}, "dependencies": {"type": "array", "items": {"type": "string", "pattern": "^U-"}, "uniqueItems": true},
+        "input_artifacts": {"$ref": "#/$defs/nonEmptyStrings"}, "inspect_targets": {"$ref": "#/$defs/nonEmptyStrings"}, "read_scope": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+        "write_scope": {"$ref": "#/$defs/nonEmptyStrings"}, "forbidden_scope": {"$ref": "#/$defs/nonEmptyStrings"}, "interfaces": {"$ref": "#/$defs/nonEmptyStrings"},
+        "procedure": {"$ref": "#/$defs/nonEmptyStrings"}, "forward_proof": {"$ref": "#/$defs/nonEmptyStrings"}, "regression_proof": {"$ref": "#/$defs/nonEmptyStrings"}, "commands": {"$ref": "#/$defs/nonEmptyStrings"},
+        "output_artifacts": {"$ref": "#/$defs/nonEmptyStrings"}, "risk": {"enum": ["low", "medium", "high", "critical"]}, "complexity": {"enum": ["low", "medium", "high"]},
+        "capability_profile": {"type": "object"}, "primary_route": {"type": ["string", "null"]}, "fallback_route": {"type": ["string", "null"]},
+        "attempt_limit": {"type": "integer", "minimum": 1, "maximum": 10}, "escalation_conditions": {"$ref": "#/$defs/nonEmptyStrings"}, "reviewer": {"type": "string", "minLength": 1},
+        "stop_conditions": {"$ref": "#/$defs/nonEmptyStrings"}, "completion_evidence": {"$ref": "#/$defs/nonEmptyStrings"}, "status": {"enum": ["pending", "in_progress", "completed", "done", "reopened", "blocked"]},
+        "semantic_hash": {"type": "string", "pattern": "^U-[0-9a-f]{24}$"}
+      }
+    }
+  }
+}

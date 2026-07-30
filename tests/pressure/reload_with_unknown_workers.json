@@ -1,0 +1,1 @@
+{"id":"reload_with_unknown_workers","design_list":"Graph Coder session reliability pressure scenario","expect":["rebuild from durable ledger","preserve unknown and superseded states","replace only genuinely missing work","refresh uncapped side panel"]}

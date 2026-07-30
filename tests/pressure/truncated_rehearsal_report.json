@@ -1,0 +1,1 @@
+{"id":"truncated_rehearsal_report","design_list":"Graph Coder session reliability pressure scenario","expect":["do not count truncated delivery as a pass","persist complete report","mark coverage missing or truncated","rerun exact pass"]}

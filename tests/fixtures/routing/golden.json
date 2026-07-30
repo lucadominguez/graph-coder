@@ -1,0 +1,21 @@
+[
+  {
+    "name": "golden-primary",
+    "selected": "open/steady",
+    "fallback": "closed/fast",
+    "retained": ["closed/fast", "open/steady"],
+    "eliminated": [
+      "bad/auth",
+      "bad/class",
+      "bad/confidence",
+      "bad/context",
+      "bad/cost",
+      "bad/environment",
+      "bad/modalities",
+      "bad/output",
+      "bad/policy",
+      "bad/streaming",
+      "bad/tools"
+    ]
+  }
+]

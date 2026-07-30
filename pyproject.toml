@@ -1,0 +1,76 @@
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
+
+[project]
+name = "graph-coder"
+version = "0.1.0"
+description = "Planning-first compiler and execution director for cost-routed agent graphs"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Graph Coder contributors" }]
+keywords = ["agents", "planning", "orchestration", "jcode", "llm-routing"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+]
+dependencies = [
+  "jsonschema>=4.23,<5",
+  "PyYAML>=6.0.2,<7",
+]
+
+[project.optional-dependencies]
+dev = [
+  "build>=1.2.2",
+  "hypothesis>=6.125",
+  "mypy>=1.15",
+  "pytest>=8.3",
+  "pytest-cov>=6.0",
+  "ruff>=0.9",
+  "types-jsonschema>=4.23",
+  "types-PyYAML>=6.0",
+]
+
+[project.scripts]
+graph-coder = "graph_coder.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/lucadominguez/graph-coder"
+Repository = "https://github.com/lucadominguez/graph-coder"
+Issues = "https://github.com/lucadominguez/graph-coder/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/graph_coder"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"schemas" = "graph_coder/schemas"
+
+[tool.pytest.ini_options]
+addopts = "-ra --strict-markers --strict-config"
+testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["graph_coder"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+fail_under = 80
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+packages = ["graph_coder"]

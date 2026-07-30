@@ -1,0 +1,82 @@
+name: upstream-awareness
+
+# Reports whether the Agent Planning System has moved past the commit pinned in
+# upstream/aps.lock.json. This workflow is deliberately inert: it has read-only
+# repository permissions, opens no pull requests, imports no code, and never
+# rewrites the lock. Acting on upstream drift is a human decision.
+
+on:
+  schedule:
+    # Mondays, 07:00 UTC.
+    - cron: "0 7 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: upstream-awareness
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: Compare pinned APS commit with APS main
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out Graph Coder
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Run the read-only upstream check
+        id: check
+        run: |
+          set +e
+          python scripts/check_aps_upstream.py --lock upstream/aps.lock.json > report.md
+          status=$?
+          set -e
+          cat report.md >> "$GITHUB_STEP_SUMMARY"
+          echo "exit_code=${status}" >> "$GITHUB_OUTPUT"
+          python scripts/check_aps_upstream.py --lock upstream/aps.lock.json --json > report.json || true
+          exit 0
+
+      - name: Upload the upstream report
+        uses: actions/upload-artifact@v4
+        with:
+          name: upstream-report
+          path: |
+            report.md
+            report.json
+          if-no-files-found: warn
+
+      - name: Interpret the exit code
+        env:
+          EXIT_CODE: ${{ steps.check.outputs.exit_code }}
+        run: |
+          case "$EXIT_CODE" in
+            0)
+              echo "APS is unchanged since the pinned commit."
+              ;;
+            2)
+              # Informational only. Upstream movement is expected and is never
+              # imported automatically.
+              echo "::notice title=APS moved::Upstream APS has changed. Review the job summary and port deliberately if wanted."
+              ;;
+            *)
+              echo "::error title=Upstream check failed::The checker could not inspect APS (exit ${EXIT_CODE})."
+              exit 1
+              ;;
+          esac
+
+      - name: Confirm the working tree was not modified
+        run: |
+          git diff --quiet -- upstream docs src schemas skills || {
+            echo "::error::The upstream check must not modify tracked files."
+            exit 1
+          }
