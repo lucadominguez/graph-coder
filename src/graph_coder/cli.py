@@ -27,7 +27,7 @@ from .config import (
 from .context import compact_context
 from .contracts import load_schema
 from .db import connect, migrate, transaction
-from .errors import ContractError, GraphCoderError
+from .errors import ContractError, GraphCoderError, RoutingError
 from .events import append_event, rebuild_projections, verify_chain
 from .graph import (
     ArtifactRef,
@@ -40,7 +40,7 @@ from .graph import (
     ReviewPolicy,
     RouteSpec,
 )
-from .llm_stats import LLMStatsClient
+from .llm_stats import DEFAULT_API_BASE, LLMStatsClient
 from .plans import (
     FileSnapshotStore,
     PlanDocument,
@@ -50,6 +50,7 @@ from .plans import (
     reconcile_completed_units,
 )
 from .recovery import recover, resume_human_required
+from .registry import assert_fresh, build_registry
 from .routing import (
     ModelCapabilities,
     ProviderCapabilities,
@@ -622,7 +623,46 @@ def _frozenset_fields(payload: dict[str, Any], fields: Sequence[str]) -> dict[st
     return value
 
 
-def _route_from_payload(payload: dict[str, Any]) -> tuple[TaskRequirements, RoutingDecision]:
+def _registry_from_cache(
+    args: argparse.Namespace, payload: dict[str, Any]
+) -> tuple[list[ModelCapabilities], list[ProviderCapabilities], JsonObject]:
+    """Build router inputs from the cached LLM Stats registry.
+
+    Routing decides how the user's money is spent, so stale evidence is refused
+    rather than quietly used. `route refresh` is the fix and the error says so.
+    """
+
+    config = _config(args)
+    cache_path = config.storage_dir / "cache" / "llm-stats" / "models.json"
+    if not cache_path.exists():
+        raise RoutingError(
+            f"no LLM Stats cache at {cache_path}: run `graph-coder route refresh` first"
+        )
+    cached = json.loads(cache_path.read_text(encoding="utf-8"))
+    records = cached.get("records", [])
+    age_hours = assert_fresh(
+        cached.get("fetched_at"),
+        max_age_hours=float(getattr(args, "max_age_hours", 24.0)),
+        source=str(cached.get("source", "cache")),
+        stale=bool(cached.get("stale", False)),
+    )
+    registry = payload.get("registry", {})
+    build = build_registry(
+        records,
+        subscription_provider_ids=frozenset(registry.get("subscription_provider_ids", [])),
+        context_window_overrides=dict(registry.get("context_window_overrides", {})),
+        input_tokens_per_attempt=int(registry.get("input_tokens_per_attempt", 40_000)),
+        output_tokens_per_attempt=int(registry.get("output_tokens_per_attempt", 8_000)),
+    )
+    report = dict(build.report)
+    report["evidence_age_hours"] = round(age_hours, 3)
+    report["cache_path"] = str(cache_path)
+    return build.models, build.providers, report
+
+
+def _route_from_payload(
+    payload: dict[str, Any], args: argparse.Namespace | None = None
+) -> tuple[TaskRequirements, RoutingDecision]:
     task = TaskRequirements(
         **_frozenset_fields(
             payload["task"],
@@ -639,16 +679,23 @@ def _route_from_payload(payload: dict[str, Any]) -> tuple[TaskRequirements, Rout
             ),
         )
     )
-    models = [
-        ModelCapabilities(**_frozenset_fields(item, ("tools", "modalities", "policies")))
-        for item in payload["models"]
-    ]
-    providers = [
-        ProviderCapabilities(**_frozenset_fields(item, ("configured", "environments")))
-        for item in payload["providers"]
-    ]
+    registry_report: JsonObject | None = None
+    if args is not None and getattr(args, "from_cache", False):
+        models, providers, registry_report = _registry_from_cache(args, payload)
+    else:
+        models = [
+            ModelCapabilities(**_frozenset_fields(item, ("tools", "modalities", "policies")))
+            for item in payload["models"]
+        ]
+        providers = [
+            ProviderCapabilities(**_frozenset_fields(item, ("configured", "environments")))
+            for item in payload["providers"]
+        ]
     history = [VerifiedHistory(**item) for item in payload.get("history", [])]
-    return task, route_model(task, models, providers, history)
+    decision = route_model(task, models, providers, history)
+    if registry_report is not None:
+        decision.explanation["registry"] = registry_report
+    return task, decision
 
 
 def _decision_payload(decision: Any) -> JsonObject:
@@ -678,7 +725,7 @@ def _receipt_for(
 
 def _cmd_route_assign(args: argparse.Namespace) -> JsonObject:
     source = _read_json(args.input)
-    task, decision = _route_from_payload(source)
+    task, decision = _route_from_payload(source, args)
     receipt = _receipt_for(task, decision, source)
     if decision.selected is None:
         # A refusal still gets a receipt: the disqualification reasons are the
@@ -764,7 +811,7 @@ def _cmd_route_assign(args: argparse.Namespace) -> JsonObject:
 
 def _cmd_route_explain(args: argparse.Namespace) -> JsonObject:
     source = _read_json(args.input)
-    task, decision = _route_from_payload(source)
+    task, decision = _route_from_payload(source, args)
     payload = {
         "ok": decision.selected is not None,
         **_decision_payload(decision),
@@ -962,13 +1009,24 @@ def build_parser() -> argparse.ArgumentParser:
         dest="route_command", required=True
     )
     refresh = route.add_parser("refresh")
-    refresh.add_argument("--base-url", default="https://llm-stats.com/api/v1")
+    refresh.add_argument("--base-url", default=DEFAULT_API_BASE)
     refresh.add_argument("--max-age-hours", type=float, default=24.0)
     _set_handler(refresh, _cmd_route_refresh)
     for name, handler in (("assign", _cmd_route_assign), ("explain", _cmd_route_explain)):
         command = route.add_parser(name)
         command.add_argument("--input", required=True)
         command.add_argument("--output")
+        command.add_argument(
+            "--from-cache",
+            action="store_true",
+            help="build the model registry from the LLM Stats cache instead of --input models",
+        )
+        command.add_argument(
+            "--max-age-hours",
+            type=float,
+            default=24.0,
+            help="refuse to route on LLM Stats evidence older than this",
+        )
         if name == "assign":
             command.add_argument("--plan-id")
             command.add_argument("--unit-id")

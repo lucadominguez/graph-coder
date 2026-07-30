@@ -1,0 +1,528 @@
+{
+  "models": [
+    {
+      "context_window": null,
+      "created_at": "2026-05-07T16:53:33.317818Z",
+      "description": "ChatGPT-4o Latest is a dynamic model that automatically points to the latest version of ChatGPT-4o. This ensures you always have access to the most recent improvements and capabilities without changing your integration.",
+      "family": null,
+      "id": "chatgpt-4o-latest",
+      "inference": {
+        "available": false,
+        "docs_url": "https://docs.llm-stats.com/gateway/chat-completions",
+        "endpoint": null,
+        "gateway_model_id": null,
+        "openai_compatible": false,
+        "supports_streaming": false,
+        "supports_tools": false,
+        "supports_vision": false
+      },
+      "knowledge_cutoff": null,
+      "license": {
+        "allow_commercial": false,
+        "id": "proprietary",
+        "name": "Proprietary"
+      },
+      "modalities": [
+        "image",
+        "text"
+      ],
+      "model_type": "llm",
+      "name": "ChatGPT-4o Latest",
+      "open_weight": false,
+      "organization": {
+        "id": "openai",
+        "name": "OpenAI"
+      },
+      "param_count": null,
+      "providers": [],
+      "release_date": "2024-05-13",
+      "source": "LLM Stats",
+      "top_scores": {
+        "biology": 0.8,
+        "chemistry": 0.8,
+        "general": 0.8,
+        "physics": 0.8,
+        "reasoning": 0.8
+      },
+      "training_tokens": null,
+      "updated_at": "2026-07-29T17:02:29.753670Z",
+      "url": "https://llm-stats.com/models/chatgpt-4o-latest"
+    },
+    {
+      "context_window": null,
+      "created_at": "2026-06-09T20:20:02.226462Z",
+      "description": "Claude Fable 5 is Anthropic's generally available deployment of the same underlying weights as the restricted Claude Mythos 5 model. Anthropic positions the model as a new capability tier above Opus: Mythos 5 is the unsafeguarded trusted-access configuration, while Fable 5 adds production safeguards for public use. The system card reports that Mythos 5 is Anthropic's most capable model to date, with state-of-the-art results across software engineering, long-context agentic tasks, vision, knowledge work, healthcare, cyber, and life-sciences evaluations; Fable 5 matches the underlying model where safeguards do not trigger and behaves closer to Claude Opus 4.8 in safeguarded domains. Fable-specific results include SWE-Bench Verified 95.0%, SWE-Bench Pro 80.0%, Terminal-Bench 2.1 84.3% mean reward with 20.9% of trials hitting a safety fallback, OSWorld-Verified 85.0%, FrontierCode Diamond 29.3%, FrontierCode Main 46.3%, GDPval-AA 1932 Elo, GDP.pdf 29.8%, Blueprint-Bench 2 38.6%, and AutomationBench 17.4%. Fable 5 uses classifiers for cybersecurity, biology and chemistry, and distillation attempts; in Claude client apps these requests fall back to the latest Claude Opus model, while the Messages API blocks by default unless developers implement or opt into fallback. Separate competitive-use safeguards target frontier LLM development work and are estimated by Anthropic to affect about 0.03% of traffic. The model was trained on a proprietary mix of public web data, public and private datasets, and synthetic data. Anthropic prices Fable 5 at $10 per million input tokens and $50 per million output tokens, and exposes it through the Claude API as `claude-fable-5`.",
+      "family": null,
+      "id": "claude-fable-5",
+      "inference": {
+        "available": true,
+        "docs_url": "https://docs.llm-stats.com/gateway/chat-completions",
+        "endpoint": "https://gateway.llm-stats.com/v1/chat/completions",
+        "gateway_model_id": "claude-fable-5",
+        "openai_compatible": true,
+        "supports_streaming": true,
+        "supports_tools": true,
+        "supports_vision": true
+      },
+      "knowledge_cutoff": null,
+      "license": {
+        "allow_commercial": false,
+        "id": "proprietary",
+        "name": "Proprietary"
+      },
+      "modalities": [
+        "image",
+        "text"
+      ],
+      "model_type": "llm",
+      "name": "Claude Fable 5",
+      "open_weight": false,
+      "organization": {
+        "id": "anthropic",
+        "name": "Anthropic"
+      },
+      "param_count": null,
+      "providers": [
+        {
+          "input_price_per_m": 10.0,
+          "latency_s": null,
+          "output_price_per_m": 50.0,
+          "provider_id": "anthropic",
+          "provider_name": "Anthropic",
+          "status": "active",
+          "throughput_tps": null
+        }
+      ],
+      "release_date": "2026-06-09",
+      "source": "LLM Stats",
+      "top_scores": {
+        "agents": 151.8,
+        "code": 0.7,
+        "finance": 907.8,
+        "frontend_development": 0.9,
+        "general": 107.4,
+        "healthcare": 0.7,
+        "legal": 907.6,
+        "math": 0.7,
+        "multimodal": 0.6,
+        "reasoning": 151.8,
+        "safety": 0.8,
+        "tool_calling": 0.5,
+        "vision": 0.6
+      },
+      "training_tokens": null,
+      "updated_at": "2026-07-29T17:02:21.253467Z",
+      "url": "https://llm-stats.com/models/claude-fable-5"
+    },
+    {
+      "context_window": null,
+      "created_at": "2026-05-07T16:53:27.639917Z",
+      "description": "Claude Haiku 4.5 is Anthropic's fastest, most cost-efficient model, matching Sonnet 4's performance on coding, computer use, and agent tasks. It offers similar performance to Sonnet 4 at one-third the cost and more than twice the speed, making it ideal for high-volume, latency-sensitive applications and multi-agent orchestration.",
+      "family": null,
+      "id": "claude-haiku-4-5-20251001",
+      "inference": {
+        "available": true,
+        "docs_url": "https://docs.llm-stats.com/gateway/chat-completions",
+        "endpoint": "https://gateway.llm-stats.com/v1/chat/completions",
+        "gateway_model_id": "claude-haiku-4-5-20251001",
+        "openai_compatible": true,
+        "supports_streaming": true,
+        "supports_tools": true,
+        "supports_vision": true
+      },
+      "knowledge_cutoff": "2025-02-01",
+      "license": {
+        "allow_commercial": false,
+        "id": "proprietary",
+        "name": "Proprietary"
+      },
+      "modalities": [
+        "image",
+        "text"
+      ],
+      "model_type": "llm",
+      "name": "Claude Haiku 4.5",
+      "open_weight": false,
+      "organization": {
+        "id": "anthropic",
+        "name": "Anthropic"
+      },
+      "param_count": null,
+      "providers": [
+        {
+          "input_price_per_m": 1.0,
+          "latency_s": 0.3,
+          "output_price_per_m": 5.0,
+          "provider_id": "anthropic",
+          "provider_name": "Anthropic",
+          "status": "active",
+          "throughput_tps": 100.0
+        }
+      ],
+      "release_date": "2025-10-15",
+      "source": "LLM Stats",
+      "top_scores": {
+        "agents": 225.8,
+        "biology": 0.7,
+        "chemistry": 0.7,
+        "code": 0.6,
+        "communication": 0.8,
+        "finance": 451.2,
+        "frontend_development": 0.7,
+        "general": 48.0,
+        "healthcare": 0.5,
+        "language": 0.8,
+        "legal": 902.0,
+        "long_context": 0.3,
+        "math": 0.8,
+        "multimodal": 0.6,
+        "physics": 0.7,
+        "reasoning": 70.0,
+        "safety": 0.5,
+        "tool_calling": 0.8,
+        "vision": 0.6
+      },
+      "training_tokens": null,
+      "updated_at": "2026-07-29T17:02:21.473394Z",
+      "url": "https://llm-stats.com/models/claude-haiku-4-5-20251001"
+    },
+    {
+      "context_window": null,
+      "created_at": "2026-05-07T16:53:27.730658Z",
+      "description": "Claude Opus 4 is Anthropic's most powerful model and the world's best coding model, part of the Claude 4 family. It delivers sustained performance on complex, long-running tasks and agent workflows. Opus 4 excels at coding, advanced reasoning, and can use tools (like web search) during extended thinking. It supports parallel tool execution and has improved memory capabilities.",
+      "family": null,
+      "id": "claude-opus-4-20250514",
+      "inference": {
+        "available": true,
+        "docs_url": "https://docs.llm-stats.com/gateway/chat-completions",
+        "endpoint": "https://gateway.llm-stats.com/v1/chat/completions",
+        "gateway_model_id": "claude-opus-4-20250514",
+        "openai_compatible": true,
+        "supports_streaming": true,
+        "supports_tools": true,
+        "supports_vision": true
+      },
+      "knowledge_cutoff": null,
+      "license": {
+        "allow_commercial": false,
+        "id": "proprietary",
+        "name": "Proprietary"
+      },
+      "modalities": [
+        "image",
+        "text"
+      ],
+      "model_type": "llm",
+      "name": "Claude Opus 4",
+      "open_weight": false,
+      "organization": {
+        "id": "anthropic",
+        "name": "Anthropic"
+      },
+      "param_count": null,
+      "providers": [],
+      "release_date": "2025-05-22",
+      "source": "LLM Stats",
+      "top_scores": {
+        "agents": 0.4,
+        "biology": 0.8,
+        "chemistry": 0.8,
+        "code": 0.6,
+        "communication": 0.7,
+        "frontend_development": 0.7,
+        "general": 0.6,
+        "healthcare": 0.8,
+        "language": 0.9,
+        "math": 0.8,
+        "multimodal": 0.8,
+        "physics": 0.8,
+        "reasoning": 0.6,
+        "spatial_reasoning": 0.1,
+        "tool_calling": 0.7,
+        "vision": 0.4
+      },
+      "training_tokens": null,
+      "updated_at": "2026-07-29T17:02:21.833298Z",
+      "url": "https://llm-stats.com/models/claude-opus-4-20250514"
+    },
+    {
+      "context_window": null,
+      "created_at": "2026-05-07T16:53:27.780246Z",
+      "description": "Claude Opus 4.6 is Anthropic's most intelligent model, improving on its predecessor's coding skills with more careful planning, longer agentic task sustenance, more reliable operation in larger codebases, and better code review and debugging skills. First Opus-class model with 1M token context window (beta), 128K output tokens, and adaptive thinking. Features effort controls (low/medium/high/max) and context compaction for long-running tasks. State-of-the-art on Terminal-Bench 2.0, Humanity's Last Exam, GDPval-AA, and BrowseComp. Pricing: $5/$25 per million tokens (input/output).",
+      "family": null,
+      "id": "claude-opus-4-6",
+      "inference": {
+        "available": true,
+        "docs_url": "https://docs.llm-stats.com/gateway/chat-completions",
+        "endpoint": "https://gateway.llm-stats.com/v1/chat/completions",
+        "gateway_model_id": "claude-opus-4-6",
+        "openai_compatible": true,
+        "supports_streaming": true,
+        "supports_tools": true,
+        "supports_vision": true
+      },
+      "knowledge_cutoff": null,
+      "license": {
+        "allow_commercial": false,
+        "id": "proprietary",
+        "name": "Proprietary"
+      },
+      "modalities": [
+        "image",
+        "text"
+      ],
+      "model_type": "llm",
+      "name": "Claude Opus 4.6",
+      "open_weight": false,
+      "organization": {
+        "id": "anthropic",
+        "name": "Anthropic"
+      },
+      "param_count": null,
+      "providers": [
+        {
+          "input_price_per_m": 5.0,
+          "latency_s": 0.5,
+          "output_price_per_m": 25.0,
+          "provider_id": "anthropic",
+          "provider_name": "Anthropic",
+          "status": "active",
+          "throughput_tps": 42.0
+        }
+      ],
+      "release_date": "2026-02-05",
+      "source": "LLM Stats",
+      "top_scores": {
+        "agents": 875.4,
+        "biology": 0.9,
+        "chemistry": 0.9,
+        "code": 0.7,
+        "communication": 1.0,
+        "finance": 803.3,
+        "frontend_development": 0.8,
+        "general": 357.1,
+        "healthcare": 0.8,
+        "language": 0.9,
+        "legal": 803.0,
+        "long_context": 0.8,
+        "math": 0.8,
+        "multimodal": 0.8,
+        "physics": 0.9,
+        "reasoning": 419.1,
+        "safety": 0.8,
+        "search": 0.9,
+        "spatial_reasoning": 0.8,
+        "tool_calling": 0.8,
+        "vision": 0.7
+      },
+      "training_tokens": null,
+      "updated_at": "2026-07-29T17:02:22.038172Z",
+      "url": "https://llm-stats.com/models/claude-opus-4-6"
+    },
+    {
+      "context_window": null,
+      "created_at": "2026-05-07T16:53:28.432354Z",
+      "description": "DeepSeek-V4-Flash-Max is the maximum reasoning effort mode of DeepSeek-V4-Flash, a 284B-parameter MoE model with 13B activated parameters and a 1M-token context window. Sharing the V4 series' hybrid attention architecture (Compressed Sparse Attention combined with Heavily Compressed Attention), Manifold-Constrained Hyper-Connections, and Muon optimizer, V4-Flash-Max delivers reasoning performance comparable to V4-Pro when given a larger thinking budget while operating at a fraction of the parameter scale. It is pre-trained on more than 32T tokens and post-trained with a two-stage paradigm of domain-specific expert cultivation followed by on-policy distillation.",
+      "family": null,
+      "id": "deepseek-v4-flash-max",
+      "inference": {
+        "available": true,
+        "docs_url": "https://docs.llm-stats.com/gateway/chat-completions",
+        "endpoint": "https://gateway.llm-stats.com/v1/chat/completions",
+        "gateway_model_id": "deepseek-v4-flash-max",
+        "openai_compatible": true,
+        "supports_streaming": true,
+        "supports_tools": true,
+        "supports_vision": false
+      },
+      "knowledge_cutoff": null,
+      "license": {
+        "allow_commercial": true,
+        "id": "mit",
+        "name": "MIT"
+      },
+      "modalities": [
+        "text"
+      ],
+      "model_type": "llm",
+      "name": "DeepSeek-V4-Flash-Max",
+      "open_weight": true,
+      "organization": {
+        "id": "deepseek",
+        "name": "DeepSeek"
+      },
+      "param_count": 284000000000,
+      "providers": [
+        {
+          "input_price_per_m": 0.1,
+          "latency_s": null,
+          "output_price_per_m": 0.2,
+          "provider_id": "deepinfra",
+          "provider_name": "DeepInfra",
+          "status": "active",
+          "throughput_tps": null
+        },
+        {
+          "input_price_per_m": 0.14,
+          "latency_s": null,
+          "output_price_per_m": 0.28,
+          "provider_id": "deepseek",
+          "provider_name": "DeepSeek",
+          "status": "active",
+          "throughput_tps": null
+        },
+        {
+          "input_price_per_m": 0.14,
+          "latency_s": null,
+          "output_price_per_m": 0.28,
+          "provider_id": "novita",
+          "provider_name": "Novita",
+          "status": "active",
+          "throughput_tps": null
+        },
+        {
+          "input_price_per_m": 0.14,
+          "latency_s": null,
+          "output_price_per_m": 0.28,
+          "provider_id": "fireworks",
+          "provider_name": "Fireworks",
+          "status": "active",
+          "throughput_tps": null
+        }
+      ],
+      "release_date": "2026-04-23",
+      "source": "LLM Stats",
+      "top_scores": {
+        "agents": 201.0,
+        "biology": 0.9,
+        "chemistry": 0.9,
+        "code": 0.7,
+        "factuality": 0.3,
+        "finance": 601.9,
+        "frontend_development": 0.8,
+        "general": 64.0,
+        "healthcare": 0.9,
+        "language": 0.8,
+        "legal": 601.9,
+        "long_context": 0.8,
+        "math": 0.8,
+        "physics": 0.9,
+        "reasoning": 67.5,
+        "search": 0.7,
+        "tool_calling": 0.6,
+        "vision": 0.5
+      },
+      "training_tokens": 32000000000000,
+      "updated_at": "2026-07-29T17:02:25.191035Z",
+      "url": "https://llm-stats.com/models/deepseek-v4-flash-max"
+    },
+    {
+      "context_window": null,
+      "created_at": "2026-05-07T16:53:28.483580Z",
+      "description": "DeepSeek-V4-Pro-Max is the maximum reasoning effort mode of DeepSeek-V4-Pro, a 1.6T-parameter MoE model with 49B activated parameters and a 1M-token context window. It introduces a hybrid attention architecture combining Compressed Sparse Attention (CSA) and Heavily Compressed Attention (HCA) for dramatically improved long-context efficiency, requiring only 27% of single-token inference FLOPs and 10% of KV cache compared with DeepSeek-V3.2 at 1M-token context. The model also incorporates Manifold-Constrained Hyper-Connections (mHC) for stable signal propagation and is trained with the Muon optimizer for faster convergence. Pre-trained on more than 32T tokens, V4-Pro-Max significantly advances open-source knowledge capabilities, achieves top-tier performance in coding benchmarks, and bridges the gap with leading closed-source models on reasoning and agentic tasks.",
+      "family": null,
+      "id": "deepseek-v4-pro-max",
+      "inference": {
+        "available": true,
+        "docs_url": "https://docs.llm-stats.com/gateway/chat-completions",
+        "endpoint": "https://gateway.llm-stats.com/v1/chat/completions",
+        "gateway_model_id": "deepseek-v4-pro-max",
+        "openai_compatible": true,
+        "supports_streaming": true,
+        "supports_tools": true,
+        "supports_vision": false
+      },
+      "knowledge_cutoff": null,
+      "license": {
+        "allow_commercial": true,
+        "id": "mit",
+        "name": "MIT"
+      },
+      "modalities": [
+        "text"
+      ],
+      "model_type": "llm",
+      "name": "DeepSeek-V4-Pro-Max",
+      "open_weight": true,
+      "organization": {
+        "id": "deepseek",
+        "name": "DeepSeek"
+      },
+      "param_count": 1600000000000,
+      "providers": [
+        {
+          "input_price_per_m": 1.6,
+          "latency_s": null,
+          "output_price_per_m": 3.2,
+          "provider_id": "novita",
+          "provider_name": "Novita",
+          "status": "active",
+          "throughput_tps": null
+        },
+        {
+          "input_price_per_m": 1.74,
+          "latency_s": null,
+          "output_price_per_m": 3.48,
+          "provider_id": "deepseek",
+          "provider_name": "DeepSeek",
+          "status": "active",
+          "throughput_tps": null
+        },
+        {
+          "input_price_per_m": 1.74,
+          "latency_s": null,
+          "output_price_per_m": 3.48,
+          "provider_id": "together",
+          "provider_name": "Together",
+          "status": "active",
+          "throughput_tps": null
+        },
+        {
+          "input_price_per_m": 1.74,
+          "latency_s": null,
+          "output_price_per_m": 3.48,
+          "provider_id": "fireworks",
+          "provider_name": "Fireworks",
+          "status": "active",
+          "throughput_tps": null
+        },
+        {
+          "input_price_per_m": 1.74,
+          "latency_s": null,
+          "output_price_per_m": 3.48,
+          "provider_id": "deepinfra",
+          "provider_name": "DeepInfra",
+          "status": "active",
+          "throughput_tps": null
+        }
+      ],
+      "release_date": "2026-04-23",
+      "source": "LLM Stats",
+      "top_scores": {
+        "agents": 167.0,
+        "biology": 0.9,
+        "chemistry": 0.9,
+        "code": 0.6,
+        "factuality": 0.6,
+        "finance": 666.4,
+        "frontend_development": 0.8,
+        "general": 61.2,
+        "healthcare": 0.9,
+        "language": 0.9,
+        "legal": 666.4,
+        "long_context": 0.8,
+        "math": 0.8,
+        "physics": 0.9,
+        "reasoning": 67.3,
+        "search": 0.8,
+        "tool_calling": 0.6,
+        "vision": 0.5
+      },
+      "training_tokens": 32000000000000,
+      "updated_at": "2026-07-29T17:02:25.245738Z",
+      "url": "https://llm-stats.com/models/deepseek-v4-pro-max"
+    }
+  ],
+  "next_cursor": null,
+  "total": 7
+}

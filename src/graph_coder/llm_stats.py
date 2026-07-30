@@ -16,8 +16,20 @@ from urllib.request import Request, urlopen
 
 from .config import atomic_write
 
-DEFAULT_API_BASE = "https://llm-stats.com/api/v1"
+#: The LLM Stats data API is served by ZeroEval. Verified live on 2026-07-30:
+#: GET https://api.zeroeval.com/stats/v1/models returns
+#: {"models": [...], "next_cursor": str|null, "total": int}.
+#: The previous value (`https://llm-stats.com/api/v1`) 404s; it was never live.
+DEFAULT_API_BASE = "https://api.zeroeval.com/stats/v1"
 API_KEY_ENV = "LLM_STATS_API_KEY"
+
+#: The API sits behind Cloudflare, which rejects urllib's default User-Agent with
+#: error 1010 before the request reaches the application. A conventional UA is
+#: required for the client to function at all.
+USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"
+)
 
 
 class LLMStatsError(RuntimeError):
@@ -64,6 +76,8 @@ class LLMStatsClient:
         self.cache_ttl_seconds = cache_ttl_seconds
         self._sleep = sleep
         self._now = now
+        self._paginated_endpoint = "models"
+        self._paginated_params: dict[str, Any] = {}
 
     def fetch_models(
         self, *, endpoint: str = "models", params: dict[str, Any] | None = None
@@ -110,13 +124,21 @@ class LLMStatsClient:
             raise
 
     def _fetch_paginated(self, endpoint: str, params: dict[str, Any]) -> list[dict[str, Any]]:
+        # Remembered so cursor pagination can rebuild the same request with a cursor.
+        self._paginated_endpoint = endpoint
+        self._paginated_params = dict(params)
         url: str | None = self._url(endpoint, params)
         records: list[dict[str, Any]] = []
+        seen_cursors: set[str] = set()
         while url:
             payload = self._request_json(url)
-            page_records, next_url = self._validate_page(payload)
+            page_records, next_token = self._validate_page(payload)
             records.extend(page_records)
-            url = self._absolute_next(next_url)
+            if next_token:
+                if next_token in seen_cursors:
+                    raise LLMStatsSchemaError("LLM Stats pagination repeated a cursor")
+                seen_cursors.add(next_token)
+            url = self._absolute_next(next_token)
         return records
 
     def _fetch_collection(self, endpoint: str, required_key: str | None) -> list[dict[str, Any]]:
@@ -142,7 +164,12 @@ class LLMStatsClient:
             if not key:
                 raise LLMStatsError(f"{API_KEY_ENV} is required")
             request = Request(
-                url, headers={"Authorization": f"Bearer {key}", "Accept": "application/json"}
+                url,
+                headers={
+                    "Authorization": f"Bearer {key}",
+                    "Accept": "application/json",
+                    "User-Agent": USER_AGENT,
+                },
             )
             try:
                 with urlopen(request, timeout=self.timeout) as response:
@@ -179,27 +206,46 @@ class LLMStatsClient:
         query = f"?{urlencode(params)}" if params else ""
         return urljoin(self.base_url, endpoint.lstrip("/")) + query
 
-    def _absolute_next(self, next_url: str | None) -> str | None:
-        if not next_url:
+    def _absolute_next(self, next_token: str | None) -> str | None:
+        """Resolve the next page.
+
+        The live API paginates by opaque cursor (`next_cursor`), so the token is
+        appended as a `cursor` query parameter. A full URL is still honoured for
+        endpoints that return one.
+        """
+
+        if not next_token:
             return None
-        return urljoin(self.base_url, next_url)
+        if next_token.startswith(("http://", "https://", "/")):
+            return urljoin(self.base_url, next_token)
+        return self._url(self._paginated_endpoint, {**self._paginated_params, "cursor": next_token})
 
     @staticmethod
     def _validate_page(payload: dict[str, Any]) -> tuple[list[dict[str, Any]], str | None]:
-        raw_items = payload.get("data", payload.get("results"))
+        """Validate one page against the live envelope.
+
+        `/stats/v1/models` returns `models`; `data` and `results` are accepted for
+        the other collections. Records are keyed by `id`, with `model_id` accepted
+        as an alias.
+        """
+
+        raw_items = payload.get("models")
+        if raw_items is None:
+            raw_items = payload.get("data", payload.get("results"))
         if not isinstance(raw_items, list):
-            raise LLMStatsSchemaError("LLM Stats page requires data/results list")
+            raise LLMStatsSchemaError("LLM Stats page requires a models/data/results list")
         items: list[dict[str, Any]] = []
         for index, item in enumerate(raw_items):
             if not isinstance(item, dict):
                 raise LLMStatsSchemaError(f"LLM Stats item {index} must be an object")
-            if not isinstance(item.get("model_id"), str) or not item["model_id"]:
-                raise LLMStatsSchemaError(f"LLM Stats item {index} requires model_id")
+            identifier = item.get("id", item.get("model_id"))
+            if not isinstance(identifier, str) or not identifier:
+                raise LLMStatsSchemaError(f"LLM Stats item {index} requires id")
             items.append(dict(item))
-        next_url = payload.get("next")
-        if next_url is not None and not isinstance(next_url, str):
-            raise LLMStatsSchemaError("LLM Stats next must be string or null")
-        return items, next_url
+        next_token = payload.get("next_cursor", payload.get("next"))
+        if next_token is not None and not isinstance(next_token, str):
+            raise LLMStatsSchemaError("LLM Stats next_cursor must be a string or null")
+        return items, next_token
 
     def _read_cache(self) -> CacheResult | None:
         if self.cache_path is None or not self.cache_path.exists():

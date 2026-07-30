@@ -29,8 +29,26 @@ Downgrading the Director to save money defeats the design: the frontier model's 
 3. Persist the user's provider, model, subscription, budget, and diversity constraints before scoring candidates. A user deny rule is a hard filter.
 4. For every node, derive hard requirements from evidence: authenticated and configured provider, context and output limits, tools, modalities, streaming, model class, provider and model allow and deny rules, execution environment, per-attempt cost ceiling, minimum evidence confidence and freshness, risk, stack, and complexity.
 5. Map task categories to a versioned benchmark-weight vector. Do not choose a model while profiling.
-6. Run `graph-coder route refresh`. Record whether the evidence is network, cache, or labeled stale cache. Do not claim current data when live validation failed.
-7. Run `graph-coder route assign --input <profile> --output <decision>` and `graph-coder route explain --input <profile>`.
+6. **Refresh the model evidence before every routing pass.** Run `graph-coder route refresh` and record whether the result is `network`, `cache`, or `stale_cache`. Never claim current data when the live fetch failed.
+7. Run `graph-coder route assign --from-cache --input <profile> --output <decision>` and `graph-coder route explain --from-cache --input <profile>`.
+
+## Freshness is mandatory
+
+Routing decides how the user's money is spent. Doing that on a week-old price table is worse than stopping to ask.
+
+```text
+graph-coder route refresh
+graph-coder route assign --from-cache --input <profile> --max-age-hours 24
+```
+
+`--from-cache` builds the model registry from the cached LLM Stats records instead of a hand-written `models` array, and refuses to run when the evidence is older than `--max-age-hours` (default 24) or when the client already flagged the cache stale. The refusal names the fix. Do not work around it by hand-assembling a profile: that is how a stale price silently becomes a routing decision.
+
+Every decision carries a `registry` report with the evidence age, the number of routes built, and the cost assumptions used. Attach it to the plan alongside the route receipt.
+
+### Two limits to state, not hide
+
+- **The API reports no context window.** Every model returned on 2026-07-30 had `context_window: null`. A unit that declares `min_context_tokens` will therefore eliminate every candidate. Supply `registry.context_window_overrides` with values you have actually verified, and say where they came from. Never invent one.
+- **Per-attempt cost is derived.** The API publishes `input_price_per_m` and `output_price_per_m`; converting those into a per-attempt cost requires assuming the tokens an attempt spends. Those assumptions are inputs (`registry.input_tokens_per_attempt`, `registry.output_tokens_per_attempt`) and appear in the report. Present the resulting cost as an estimate.
 8. Attach the receipt to the same canonical plan, in section 11.
 9. Add expected and observed spend to the cumulative project ledger for all metered services, not only model tokens. Refuse a dispatch that would exceed the applicable hard cap.
 10. A manual override must still meet hard requirements. Use a force flag only with an explicit recorded warning and Director authority.
@@ -119,7 +137,9 @@ python skills/routing-plan/scripts/llm_stats.py rankings <category>
 python skills/routing-plan/scripts/llm_stats.py benchmarks <model-id>
 ```
 
-It reads `LLM_STATS_API_KEY` only from the environment, emits JSON, bounds retries and timeouts, and labels results as `network`, `cache`, or `stale_cache`. Never print or persist the key. The endpoint mapping remains provisional until a configured live smoke test succeeds.
+It reads `LLM_STATS_API_KEY` only from the environment, emits JSON, bounds retries and timeouts, and labels results as `network`, `cache`, or `stale_cache`. Never print or persist the key.
+
+The API is served by ZeroEval at `https://api.zeroeval.com/stats/v1`, verified live on 2026-07-30 against `GET /stats/v1/models` returning `{models, next_cursor, total}` for 335 models. Pagination is by opaque cursor. The endpoint sits behind Cloudflare, which rejects a default urllib User-Agent with error 1010, so the client sends a conventional one.
 
 ## Decision surfaces
 
@@ -127,7 +147,7 @@ Role category, task capability profile, hard versus soft requirement, evidence f
 
 ## Evidence rules
 
-Use persisted LLM Stats source records and independently verified local outcomes only. Never store `LLM_STATS_API_KEY`. Record actual model and provider receipts where the harness exposes them. Mark the installed harness endpoint shape provisional until a live configured smoke test succeeds. Record every user exclusion, direct-subscription candidate, reseller duplicate elimination, fallback activation reason, and cumulative all-service cost check.
+Use persisted LLM Stats source records and independently verified local outcomes only. Never store `LLM_STATS_API_KEY`. Record actual model and provider receipts where the harness exposes them. Record the evidence age and source label on every routing pass, and every user exclusion, direct-subscription candidate, reseller duplicate elimination, fallback activation reason, and cumulative all-service cost check. State derived costs and any supplied context-window override as what they are.
 
 ## Schemas
 

@@ -148,7 +148,7 @@ def test_schema_validation(fake_server: str, monkeypatch: pytest.MonkeyPatch) ->
     FakeStatsHandler.responses = [(200, {}, {"data": [{"name": "missing-model-id"}], "next": None})]
     client = LLMStatsClient(base_url=fake_server)
 
-    with pytest.raises(LLMStatsSchemaError, match="model_id"):
+    with pytest.raises(LLMStatsSchemaError, match="requires id"):
         client.fetch_models()
 
 
