@@ -1,6 +1,6 @@
 # Installation
 
-## Python package (`aps` CLI)
+## Python package (`graph-coder` CLI)
 
 ```sh
 python -m venv .venv
@@ -12,7 +12,7 @@ Python 3.11 or later is required. Runtime dependencies are limited to `jsonschem
 
 ## Portable skills installers
 
-The installers copy the seven Graph Coder skills (`aps-plan`, `idea-grill`, `plan-forge`, `plan-rehearsal`, `routing-plan`, `delegation-graph`, `execution-manager`) into the project. They are idempotent and safe to re-run.
+The installers copy the eight Graph Coder skills (`graph-coder`, `concept-grill`, `technical-research`, `plan-forge`, `plan-rehearsal`, `delegation-graph`, `routing-plan`, `execution-manager`) into the project. They are idempotent and safe to re-run.
 
 Default project-local install to `.agents/skills`:
 
@@ -49,6 +49,6 @@ powershell -File scripts/install.ps1 -ProjectRoot <path> -Dest <dir>
 
 ## Security notes
 
-- No installer reads or writes secrets, and the `aps` CLI never persists provider credentials.
-- `LLM_STATS_API_KEY` is read from the environment only when `aps route refresh` makes a network request, and is never written to the cache.
-- Terminal helpers use `wt.exe` and intentionally do not require Komorebi. `aps terminal open` is a dry run unless `--execute` is passed.
+- No installer reads or writes secrets, and the `graph-coder` CLI never persists provider credentials.
+- `LLM_STATS_API_KEY` is read from the environment only when `graph-coder route refresh` makes a network request, and is never written to the cache.
+- Terminal helpers use `wt.exe` and intentionally do not require Komorebi. `graph-coder terminal open` is a dry run unless `--execute` is passed.

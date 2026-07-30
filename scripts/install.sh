@@ -39,13 +39,13 @@ copy_skill() {
 }
 
 mkdir_cmd "$DEST_ROOT"
-for skill in aps-plan idea-grill plan-forge plan-rehearsal routing-plan delegation-graph execution-manager; do
+for skill in graph-coder concept-grill technical-research plan-forge plan-rehearsal delegation-graph routing-plan execution-manager; do
   copy_skill "$SOURCE_ROOT/$skill" "$DEST_ROOT/$skill"
 done
 if [ "$INSTALL_JCODE_VIEW" -eq 1 ]; then
   JCODE_ROOT="$PROJECT_ROOT/.jcode/skills"
   mkdir_cmd "$JCODE_ROOT"
-  for skill in aps-plan idea-grill plan-forge plan-rehearsal routing-plan delegation-graph execution-manager; do
+  for skill in graph-coder concept-grill technical-research plan-forge plan-rehearsal delegation-graph routing-plan execution-manager; do
     copy_skill "$SOURCE_ROOT/$skill" "$JCODE_ROOT/$skill"
   done
 fi

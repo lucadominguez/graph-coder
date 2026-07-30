@@ -5,7 +5,7 @@ param(
   [string]$Dest = ".agents/skills"
 )
 $ErrorActionPreference = "Stop"
-$Skills = @("aps-plan", "idea-grill", "plan-forge", "plan-rehearsal", "routing-plan", "delegation-graph", "execution-manager")
+$Skills = @("graph-coder", "concept-grill", "technical-research", "plan-forge", "plan-rehearsal", "delegation-graph", "routing-plan", "execution-manager")
 $SourceRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "../skills"))
 $DestinationRoot = if ([System.IO.Path]::IsPathRooted($Dest)) { $Dest } else { Join-Path $ProjectRoot $Dest }
 
