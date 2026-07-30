@@ -13,7 +13,13 @@ from pathlib import Path
 from typing import Any, ClassVar
 
 from graph_coder.errors import CompatibilityError
-from graph_coder.graph import ExecutionGraph, GraphNode, NodeKind, NodeRole, PlanUnit
+from graph_coder.graph import (
+    ExecutionGraph,
+    GraphNode,
+    NodeKind,
+    NodeRole,
+    PlanUnit,
+)
 
 TARGET_VERSION = "0.55.0"
 SUPPORTED_CAPABILITIES = {
@@ -24,13 +30,16 @@ SUPPORTED_CAPABILITIES = {
     "typed_reports",
 }
 
+# Managers are deliberately absent from this map. They are control-plane agents,
+# like the Director: they advise and review, so they are never dispatched as
+# swarm implementation tasks. Disguising a manager as a worker would hand it a
+# write scope the graph explicitly denies it.
 _KIND_TO_NATIVE = {
     NodeKind.EXPLORE: "explore",
     NodeKind.SPIKE: "explore",
     NodeKind.IMPLEMENT: "implement",
     NodeKind.VERIFY: "verify",
     NodeKind.INTEGRATE: "synthesize",
-    NodeKind.REVIEW: "verify",
     NodeKind.REPAIR: "fix",
     NodeKind.RELEASE: "synthesize",
 }
@@ -91,12 +100,31 @@ class JCodeAdapter:
             )
 
     def native_kind(self, kind: NodeKind | str) -> str:
-        return self.native_kind_map[NodeKind(kind)]
+        resolved = NodeKind(kind)
+        if resolved is NodeKind.MANAGE:
+            raise CompatibilityError(
+                "manage nodes are control-plane agents and are not dispatched as swarm "
+                "tasks; they advise and review their own subtree"
+            )
+        return self.native_kind_map[resolved]
+
+    def dispatchable(self, graph: ExecutionGraph) -> list[GraphNode]:
+        """Nodes JCode actually runs: everything except the Director and managers."""
+
+        return [
+            node
+            for node in graph.topological_nodes()
+            if node.id != graph.root_id and node.kind != NodeKind.MANAGE
+        ]
+
+    def control_plane(self, graph: ExecutionGraph) -> list[GraphNode]:
+        return [node for node in graph.topological_nodes() if node.kind == NodeKind.MANAGE]
 
     def task_graph_bundle(self, graph: ExecutionGraph) -> JCodeOperation:
         graph.validate()
         self.validate_capabilities(graph)
-        dispatch_nodes = [node for node in graph.topological_nodes() if node.id != graph.root_id]
+        dispatch_nodes = self.dispatchable(graph)
+        managers = self.control_plane(graph)
         recursive = bool(graph.metadata.get("recursive_spawning", False))
         return JCodeOperation(
             action="task_graph",
@@ -110,6 +138,24 @@ class JCodeAdapter:
                     "target_jcode_version": self.target_version,
                     "recursive_spawning": recursive,
                     "private_protocol_dependency": False,
+                    "managers": [
+                        {
+                            "manager_id": manager.id,
+                            "authority": str(manager.authority),
+                            "write_scopes": list(manager.write_scopes),
+                            "reviews": [
+                                node.id
+                                for node in graph.nodes
+                                if node.review_owner == manager.id
+                            ],
+                        }
+                        for manager in managers
+                    ],
+                    "review_assignments": {
+                        node.id: node.review_owner
+                        for node in dispatch_nodes
+                        if node.review_owner
+                    },
                 },
             },
         )
@@ -134,9 +180,16 @@ class JCodeAdapter:
         return [self.task_graph_bundle(graph), self.run_plan_bundle(graph)]
 
     def director_prompt(self, graph: ExecutionGraph) -> str:
-        units = [unit for unit in graph.compile_plan_units() if graph.root_id not in unit.node_ids]
+        # Managers and the Director coordinate; they are not dispatched work.
+        units = [
+            unit
+            for unit in graph.compile_plan_units()
+            if graph.root_id not in unit.node_ids and NodeKind(unit.kind) is not NodeKind.MANAGE
+        ]
         lines = [
             "You are the foreground JCode Director. Preserve Director control.",
+            "You direct, advise, and review branch outputs. You never edit implementation "
+            "files and never complete a failed worker's task yourself.",
             f"Execute Graph Coder graph {graph.schema_version} "
             f"against JCode target {self.target_version}.",
             "Use public swarm task_graph/run_plan operations with background execution.",
@@ -165,8 +218,10 @@ class JCodeAdapter:
             "depends_on": [dependency for dependency in node.depends_on if dependency != root_id],
             "priority": str(node.priority),
             "metadata": {
-                "aps_kind": str(node.kind),
+                "graph_coder_kind": str(node.kind),
                 "role": str(node.role),
+                "authority": str(node.authority),
+                "review_owner": node.review_owner,
                 "unit_ids": list(node.unit_ids),
                 "parent_owner": node.parent_owner,
                 "risk": str(node.risk),
@@ -192,9 +247,16 @@ class JCodeAdapter:
         return task
 
     def _node_prompt(self, node: GraphNode) -> str:
+        review_line = (
+            f"Submit your report to manager {node.review_owner} for review. Only its passing "
+            "review completes this node; you do not mark yourself complete."
+            if node.review_owner
+            else "No manager is assigned to review this node."
+        )
         return "\n".join(
             [
                 f"Graph Coder node {node.id}: {node.title}",
+                review_line,
                 f"Portable kind: {node.kind}; native kind: {self.native_kind(node.kind)}.",
                 f"Read scopes: {node.read_scopes or ['<none>']}.",
                 f"Write scopes: {node.write_scopes or ['<none>']}.",

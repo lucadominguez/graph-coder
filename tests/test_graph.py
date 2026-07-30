@@ -31,20 +31,28 @@ def test_json_roundtrip_preserves_v1_fields() -> None:
     kinds = [kind.value for kind in NodeKind]
     nodes = [director(children=["n0"])]
     for index, kind in enumerate(kinds):
-        role = NodeRole.COMPOSITE if kind in {"explore", "integrate"} else NodeRole.ATOMIC
+        # `manage` nodes are advisory branch owners: always composite, never
+        # holding a write scope.
+        managing = kind == "manage"
+        role = (
+            NodeRole.COMPOSITE
+            if managing or kind in {"explore", "integrate"}
+            else NodeRole.ATOMIC
+        )
         deps = ["Director"] if index == 0 else [f"n{index - 1}"]
         nodes.append(
             node(
                 f"n{index}",
                 kind=kind,
                 role=role,
+                authority="advisory_only" if managing else "implementation",
                 depends_on=deps,
                 artifact_inputs=[ArtifactRef(name=f"artifact-{index - 1}", required=False)]
                 if index
                 else [],
                 artifact_outputs=[ArtifactRef(name=f"artifact-{index}")],
                 read_scopes=["src"],
-                write_scopes=[f"file-{index}.py"],
+                write_scopes=[] if managing else [f"file-{index}.py"],
                 acceptance=["done"],
                 review=ReviewPolicy(required=True, checklist=["checked"]),
                 risk="high",

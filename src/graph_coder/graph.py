@@ -17,12 +17,20 @@ SCHEMA_VERSION = "agent-planning-system/v1"
 
 
 class NodeKind(StrEnum):
+    """Portable node kinds.
+
+    There is deliberately no `review` kind. Review is a manager verdict and a
+    durable artifact, not a task in the delegation DAG, so a graph can never
+    record the one structure the product forbids. `MANAGE` replaces it: an
+    advisory control-plane node that owns a branch and reviews its children.
+    """
+
+    MANAGE = "manage"
     EXPLORE = "explore"
     SPIKE = "spike"
     IMPLEMENT = "implement"
     VERIFY = "verify"
     INTEGRATE = "integrate"
-    REVIEW = "review"
     REPAIR = "repair"
     RELEASE = "release"
 
@@ -30,6 +38,13 @@ class NodeKind(StrEnum):
 class NodeRole(StrEnum):
     ATOMIC = "atomic"
     COMPOSITE = "composite"
+
+
+class NodeAuthority(StrEnum):
+    """Whether a node may touch the repository at all."""
+
+    ADVISORY_ONLY = "advisory_only"
+    IMPLEMENTATION = "implementation"
 
 
 class Priority(StrEnum):
@@ -113,6 +128,8 @@ class GraphNode:
     unit_ids: list[str] = field(default_factory=list)
     parent_owner: str | None = "Director"
     role: NodeRole | str = NodeRole.ATOMIC
+    authority: NodeAuthority | str = NodeAuthority.IMPLEMENTATION
+    review_owner: str | None = None
     depends_on: list[str] = field(default_factory=list)
     artifact_inputs: list[ArtifactRef] = field(default_factory=list)
     artifact_outputs: list[ArtifactRef] = field(default_factory=list)
@@ -133,6 +150,7 @@ class GraphNode:
     def __post_init__(self) -> None:
         self.kind = NodeKind(self.kind)
         self.role = NodeRole(self.role)
+        self.authority = NodeAuthority(self.authority)
         self.risk = Risk(self.risk)
         self.priority = Priority(self.priority)
         self.artifact_inputs = [
@@ -156,6 +174,7 @@ class GraphNode:
         data = asdict(self)
         data["kind"] = str(self.kind)
         data["role"] = str(self.role)
+        data["authority"] = str(self.authority)
         data["risk"] = str(self.risk)
         data["priority"] = str(self.priority)
         return data
@@ -254,6 +273,46 @@ class ExecutionGraph:
         self._validate_artifacts(nodes)
         self._validate_acyclic_and_depth(nodes)
         self._validate_write_safety(nodes)
+        self._validate_authority(nodes)
+
+    def _validate_authority(self, nodes: dict[str, GraphNode]) -> None:
+        """Enforce the manager and worker boundary at compile time.
+
+        A manager that can write to the repository is not a manager, and a
+        review owner that is not an advisory manager is a reviewer wearing a
+        manager's name. Both are rejected here rather than left to prose.
+        """
+
+        for node in self.nodes:
+            if node.kind == NodeKind.MANAGE:
+                if node.role != NodeRole.COMPOSITE:
+                    raise ContractError(f"manage node {node.id} must be composite")
+                if node.authority != NodeAuthority.ADVISORY_ONLY:
+                    raise ContractError(f"manage node {node.id} must be advisory_only")
+                if node.write_scopes:
+                    raise ContractError(
+                        f"manage node {node.id} must have an empty write scope; "
+                        "managers advise and review, they do not implement"
+                    )
+            elif node.authority == NodeAuthority.ADVISORY_ONLY and node.write_scopes:
+                raise ContractError(
+                    f"advisory_only node {node.id} must have an empty write scope"
+                )
+
+            if node.review_owner is None:
+                continue
+            if node.review_owner == node.id:
+                raise ContractError(f"node {node.id} cannot review itself")
+            owner = nodes.get(node.review_owner)
+            if owner is None:
+                raise ContractError(
+                    f"node {node.id} names unknown review_owner {node.review_owner}"
+                )
+            if owner.id != self.root_id and owner.kind != NodeKind.MANAGE:
+                raise ContractError(
+                    f"review_owner {owner.id} of node {node.id} must be a manage node "
+                    "or the root Director"
+                )
 
     def _validate_artifacts(self, nodes: dict[str, GraphNode]) -> None:
         producers: dict[str, str] = {}

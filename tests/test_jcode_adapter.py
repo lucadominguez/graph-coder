@@ -10,26 +10,40 @@ from graph_coder.graph import ExecutionGraph, GraphNode, NodeKind, ReviewPolicy,
 
 
 def sample_graph(capabilities: list[str] | None = None) -> ExecutionGraph:
+    """A Director, one advisory manager, and the workers it reviews."""
+
     return ExecutionGraph(
         nodes=[
             GraphNode(
                 id="Director",
                 kind="explore",
                 role="composite",
+                authority="advisory_only",
                 title="Director",
-                children=["explore", "implement", "review"],
+                children=["manager"],
                 route=RouteSpec(capabilities=capabilities or []),
+            ),
+            GraphNode(
+                id="manager",
+                kind="manage",
+                role="composite",
+                authority="advisory_only",
+                title="Manage the change branch",
+                depends_on=["Director"],
+                review_owner="Director",
+                children=["explore", "implement", "verify"],
             ),
             GraphNode(
                 id="explore",
                 kind="spike",
                 title="Explore unknowns",
-                depends_on=["Director"],
+                depends_on=["manager"],
                 prompt="Find constraints",
                 read_scopes=["src"],
                 artifact_outputs=[{"name": "notes"}],
                 acceptance=["constraints listed"],
                 review=ReviewPolicy(required=True, checklist=["evidence cited"]),
+                review_owner="manager",
             ),
             GraphNode(
                 id="implement",
@@ -39,14 +53,16 @@ def sample_graph(capabilities: list[str] | None = None) -> ExecutionGraph:
                 artifact_inputs=[{"name": "notes", "producer": "explore"}],
                 write_scopes=["src/app.py"],
                 acceptance=["tests pass"],
+                review_owner="manager",
             ),
             GraphNode(
-                id="review",
-                kind="review",
-                title="Review change",
+                id="verify",
+                kind="verify",
+                title="Run the compatibility suite",
                 depends_on=["implement"],
                 read_scopes=["src/app.py"],
-                acceptance=["review complete"],
+                acceptance=["compatibility suite passes"],
+                review_owner="manager",
             ),
         ]
     )
@@ -68,19 +84,36 @@ def test_detects_version_from_fixture_and_output() -> None:
     }
 
 
-def test_maps_all_portable_kinds_to_native_jcode_kinds() -> None:
+def test_maps_dispatchable_kinds_to_native_jcode_kinds() -> None:
     adapter = JCodeAdapter(version_output="jcode v0.55.0")
+    dispatchable = [kind for kind in NodeKind if kind is not NodeKind.MANAGE]
 
-    assert {kind.value: adapter.native_kind(kind) for kind in NodeKind} == {
+    assert {kind.value: adapter.native_kind(kind) for kind in dispatchable} == {
         "explore": "explore",
         "spike": "explore",
         "implement": "implement",
         "verify": "verify",
         "integrate": "synthesize",
-        "review": "verify",
         "repair": "fix",
         "release": "synthesize",
     }
+
+
+def test_there_is_no_review_kind_to_map() -> None:
+    with pytest.raises(ValueError, match="not a valid NodeKind"):
+        NodeKind("review")
+
+
+def test_managers_are_not_dispatched_as_swarm_tasks() -> None:
+    adapter = JCodeAdapter(version_output="jcode v0.55.0")
+
+    with pytest.raises(CompatibilityError, match="control-plane"):
+        adapter.native_kind(NodeKind.MANAGE)
+
+    bundle = adapter.task_graph_bundle(sample_graph())
+    dispatched = [node["id"] for node in bundle.arguments["nodes"]]
+    assert "manager" not in dispatched
+    assert "Director" not in dispatched
 
 
 def test_emits_director_mediated_task_graph_and_background_run_plan() -> None:
@@ -95,10 +128,9 @@ def test_emits_director_mediated_task_graph_and_background_run_plan() -> None:
     assert [node["id"] for node in task_graph.arguments["nodes"]] == [
         "explore",
         "implement",
-        "review",
+        "verify",
     ]
     assert task_graph.arguments["mode"] == "light"
-    assert task_graph.arguments["nodes"][0]["depends_on"] == []
     assert task_graph.arguments["nodes"][0]["kind"] == "explore"
     assert task_graph.arguments["nodes"][1]["kind"] == "implement"
     assert task_graph.to_dict()["tool"] == "swarm"
@@ -107,6 +139,31 @@ def test_emits_director_mediated_task_graph_and_background_run_plan() -> None:
     assert run_plan.arguments["background"] is True
     assert run_plan.arguments["root_director"] == "Director"
     assert "foreground JCode Director" in run_plan.arguments["prompt"]
+
+
+def test_manager_metadata_records_advisory_authority_and_review_assignments() -> None:
+    adapter = JCodeAdapter(version_output="jcode v0.55.0")
+    metadata = adapter.task_graph_bundle(sample_graph()).arguments["metadata"]
+
+    managers = metadata["managers"]
+    assert [manager["manager_id"] for manager in managers] == ["manager"]
+    assert managers[0]["authority"] == "advisory_only"
+    assert managers[0]["write_scopes"] == []
+    assert set(managers[0]["reviews"]) == {"explore", "implement", "verify"}
+    assert metadata["review_assignments"] == {
+        "explore": "manager",
+        "implement": "manager",
+        "verify": "manager",
+    }
+
+
+def test_every_worker_prompt_names_its_manager_and_review_contract() -> None:
+    adapter = JCodeAdapter(version_output="jcode v0.55.0")
+    for task in adapter.task_graph_bundle(sample_graph()).arguments["nodes"]:
+        assert "Submit your report to manager manager for review." in task["content"]
+        assert "you do not mark yourself complete" in task["content"]
+        assert task["metadata"]["review_owner"] == "manager"
+        assert task["metadata"]["authority"] == "implementation"
 
 
 def test_prompts_and_reports_preserve_acceptance_review_and_scope_context() -> None:
@@ -119,6 +176,7 @@ def test_prompts_and_reports_preserve_acceptance_review_and_scope_context() -> N
     assert "Read scopes: ['src']" in task["content"]
     assert task["metadata"]["acceptance"] == ["constraints listed"]
     assert task["metadata"]["review_required"] is True
+    assert task["metadata"]["graph_coder_kind"] == "spike"
 
 
 def test_unsupported_capabilities_are_explicitly_rejected() -> None:
