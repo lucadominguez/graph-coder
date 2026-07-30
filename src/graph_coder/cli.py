@@ -48,7 +48,7 @@ from .plans import (
     parse_markdown_plan,
     reconcile_completed_units,
 )
-from .recovery import recover
+from .recovery import recover, resume_human_required
 from .routing import (
     ModelCapabilities,
     ProviderCapabilities,
@@ -805,6 +805,21 @@ def _cmd_run_recover(args: argparse.Namespace) -> JsonObject:
     return {"ok": True, "recovery": packet}
 
 
+def _cmd_run_resume(args: argparse.Namespace) -> JsonObject:
+    _, connection = _database(args)
+    try:
+        result = resume_human_required(
+            connection,
+            node_id=args.node_id,
+            decision=args.decision,
+            decided_by=args.decided_by,
+            target_status=args.status,
+        )
+    finally:
+        connection.close()
+    return {"ok": True, "resume": result}
+
+
 def _cmd_context_build(args: argparse.Namespace) -> JsonObject:
     repository = compact_context(_root(args), limit=args.limit)
     config = _config(args)
@@ -952,6 +967,16 @@ def build_parser() -> argparse.ArgumentParser:
     run_recover = run.add_parser("recover")
     run_recover.add_argument("--role", default="Director")
     _set_handler(run_recover, _cmd_run_recover)
+    run_resume = run.add_parser(
+        "resume", help="record a human decision on a human_required branch"
+    )
+    run_resume.add_argument("--node-id", required=True)
+    run_resume.add_argument("--decision", required=True, help="what the human decided, and why")
+    run_resume.add_argument("--decided-by", default="user")
+    run_resume.add_argument(
+        "--status", default="ready", choices=("ready", "cancelled", "failed")
+    )
+    _set_handler(run_resume, _cmd_run_resume)
 
     context = commands.add_parser("context", help="role-specific context packets").add_subparsers(
         dest="context_command", required=True
