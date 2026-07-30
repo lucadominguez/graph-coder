@@ -154,9 +154,12 @@ to the job summary.
 
 - Live behavioral evaluation has not been run. The rules above that live in skill
   prose are instructions, not guarantees; only the enforced list is mechanical.
-- The LLM Stats client targets the provisional `https://llm-stats.com/api/v1`
-  schema, validated against fixtures and cached responses. Live API validation
-  remains provisional until an authenticated fetch is recorded.
+- The LLM Stats client targets ZeroEval at `https://api.zeroeval.com/stats/v1`,
+  verified live on 2026-07-30 against `GET /stats/v1/models`. The API reports no
+  context window for any model, so a unit that declares `min_context_tokens`
+  eliminates every route unless you supply `context_window_overrides`. Per-attempt
+  cost is derived from published per-million prices and assumed token counts, and
+  is labelled an estimate in the route receipt.
 - The JCode adapter targets v0.55.0, detects the installed version via
   `jcode --version`, and emits public swarm bundles only. It was written against
   the documented public interface, not verified against a running JCode.
@@ -164,5 +167,8 @@ to the job summary.
   or manage workers itself.
 - `terminal open --execute` needs Windows with `wt.exe`. Komorebi is not required.
 
-See `docs/architecture.md`, `docs/design-contract.md`, `docs/skills.md`,
-`docs/installation.md`, and `CHANGELOG.md`.
+`docs/schematic.md` draws the whole system in text: the skill/code split, the
+10-phase lifecycle, the execution hierarchy, what the graph refuses to compile,
+the state machine, routing from live data to a receipt, and durability. Start
+there. Then see `docs/architecture.md`, `docs/design-contract.md`,
+`docs/skills.md`, `docs/installation.md`, and `CHANGELOG.md`.

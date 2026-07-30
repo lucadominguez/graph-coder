@@ -40,6 +40,13 @@ identities renamed and provenance recorded before any behavior changed.
   read-only workflow that reports drift and imports nothing.
 - **`docs/importing-from-aps.md`** documenting the by-hand path, since no
   automatic importer ships.
+- **`registry.py`**: live LLM Stats records become router inputs, one route per
+  `(model, provider)` pair, so subscription-first has comparable candidates.
+  `route assign|explain --from-cache` refuses stale or expired evidence and names
+  `route refresh` as the fix.
+- **`docs/schematic.md`**: a text-art schematic of the whole system, from the
+  skill/code split through the lifecycle, hierarchy, state machine, routing, and
+  durability.
 
 ### Changed
 
@@ -59,6 +66,11 @@ identities renamed and provenance recorded before any behavior changed.
 - The ready frontier no longer accepts `done` as satisfying a dependency.
 - Native schemas moved to `schemas/v1/`; byte-for-byte APS copies are frozen under
   `schemas/import/aps-v1/`.
+- The LLM Stats base URL is ZeroEval's `https://api.zeroeval.com/stats/v1`. The
+  inherited `https://llm-stats.com/api/v1` 404s and was never live. The response
+  is `{models, next_cursor, total}` paginated by opaque cursor, not `{data, next}`,
+  and the client sends a conventional User-Agent because Cloudflare rejects
+  urllib's default with error 1010.
 - Installers deliver eight skills.
 
 ### Removed
@@ -76,5 +88,9 @@ identities renamed and provenance recorded before any behavior changed.
   is verified by tests.
 - The JCode adapter was written against the documented public swarm interface and
   has not been verified against a running JCode.
-- The LLM Stats endpoint mapping remains provisional until an authenticated live
-  fetch is recorded.
+- The LLM Stats API reports no context window for any model, so a unit that
+  declares `min_context_tokens` eliminates every route unless
+  `context_window_overrides` supplies the numbers. The build counts and warns
+  rather than inventing them.
+- Per-attempt cost is derived from published per-million prices and assumed token
+  counts. The assumptions are inputs and are labelled estimates in the receipt.
