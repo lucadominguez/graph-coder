@@ -137,7 +137,8 @@ class JCodeAdapter:
         units = [unit for unit in graph.compile_plan_units() if graph.root_id not in unit.node_ids]
         lines = [
             "You are the foreground JCode Director. Preserve Director control.",
-            f"Execute Graph Coder graph {graph.schema_version} against JCode target {self.target_version}.",
+            f"Execute Graph Coder graph {graph.schema_version} "
+            f"against JCode target {self.target_version}.",
             "Use public swarm task_graph/run_plan operations with background execution.",
             "Plan units:",
         ]

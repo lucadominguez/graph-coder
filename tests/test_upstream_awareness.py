@@ -16,7 +16,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
-import check_aps_upstream as checker  # noqa: E402
+import check_aps_upstream as checker
 
 GIT_ENV_ARGS = [
     "-c",

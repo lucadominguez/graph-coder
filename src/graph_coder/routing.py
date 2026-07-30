@@ -1,15 +1,45 @@
-"""Deterministic model routing for Graph Coder."""
+"""Deterministic model routing for Graph Coder.
+
+Routing is a pure function of the registry and the unit: the same inputs always
+produce the same route, and every assignment can emit a receipt explaining why.
+
+Two policies live here rather than in skill prose, because prose cannot enforce
+them. Subscription-first precedence decides between an eligible direct route and
+a paid reseller route. Role categories pin the Director to its configured
+frontier model so a cost heuristic can never quietly downgrade it.
+"""
 
 from __future__ import annotations
 
 import math
 from dataclasses import asdict, dataclass, field
-from typing import Any
+from typing import Any, Literal
+
+from .errors import RoutingError
+
+RouteRole = Literal["director", "manager", "worker", "research", "rehearsal"]
+
+ROUTE_ROLES: frozenset[str] = frozenset(
+    {"director", "manager", "worker", "research", "rehearsal"}
+)
+
+NORMALIZATION_VERSION = "graph-coder/routing/v1"
+
+# Provider classes, in subscription-first precedence order. A reseller route is
+# only reached when no eligible direct or zero-marginal-cost route exists.
+DIRECT_SUBSCRIPTION_CLASSES: frozenset[str] = frozenset({"direct_oauth"})
+RESELLER_CLASSES: frozenset[str] = frozenset({"reseller"})
 
 
 @dataclass(frozen=True)
 class TaskRequirements:
     task_id: str
+    role: RouteRole = "worker"
+    pinned_model_id: str | None = None
+    subscription_first: bool = False
+    equivalence_class: str | None = None
+    repair_cost_factor: float = 0.0
+    escalation_cost: float = 0.0
     requires_auth: bool = True
     required_configuration: frozenset[str] = frozenset()
     min_context_tokens: int = 0
@@ -35,6 +65,17 @@ class TaskRequirements:
     manual_override_model_id: str | None = None
     force_override: bool = False
 
+    def __post_init__(self) -> None:
+        if self.role not in ROUTE_ROLES:
+            if self.role == "reviewer":
+                raise RoutingError(
+                    "there is no standalone reviewer route category: a worker's review "
+                    "runs on its manager's route"
+                )
+            raise RoutingError(
+                f"unknown route role {self.role!r}; expected one of {sorted(ROUTE_ROLES)}"
+            )
+
 
 @dataclass(frozen=True)
 class ProviderCapabilities:
@@ -43,6 +84,7 @@ class ProviderCapabilities:
     configured: frozenset[str] = frozenset()
     reliability: float = 0.0
     environments: frozenset[str] = frozenset({"production"})
+    provider_class: str = "direct_api"
 
 
 @dataclass(frozen=True)
@@ -62,6 +104,8 @@ class ModelCapabilities:
     open_weight: bool = False
     benchmarks: dict[str, float] = field(default_factory=dict)
     evidence_age_hours: float = 0.0
+    zero_marginal_cost: bool = False
+    equivalence_class: str | None = None
 
 
 @dataclass(frozen=True)
@@ -90,6 +134,11 @@ class RoutingDecision:
     candidates: list[CandidateScore]
     eliminations: list[dict[str, Any]]
     explanation: dict[str, Any]
+    scored: list[CandidateScore] = field(default_factory=list)
+    """Every candidate that cleared the hard filters, before frontier pruning.
+
+    Receipts report what was considered, not only what survived.
+    """
 
 
 def route_model(
@@ -109,6 +158,19 @@ def route_model(
     history_by_model = {item.model_id: item for item in history or []}
     eliminations: list[dict[str, Any]] = []
     passed: list[tuple[ModelCapabilities, ProviderCapabilities]] = []
+
+    if task.role == "director":
+        return _route_pinned_director(
+            task,
+            models,
+            provider_by_id,
+            history_by_model,
+            local_prior_successes,
+            local_prior_attempts,
+            external_weight,
+            local_weight,
+            fallback_failure_weight,
+        )
 
     for model in sorted(models, key=lambda item: item.model_id):
         provider = provider_by_id.get(model.provider_id)
@@ -204,6 +266,10 @@ def route_model(
                 }
             )
 
+    subscription = _apply_subscription_first(task, quality_filtered)
+    eliminations.extend(subscription.eliminations)
+    quality_filtered = subscription.pool
+
     frontier = _pareto_frontier(quality_filtered)
     if frontier:
         best_quality = max(score.quality for score in frontier)
@@ -225,11 +291,18 @@ def route_model(
     return RoutingDecision(
         selected=selected,
         candidates=sorted(with_fallbacks, key=_selection_key),
+        scored=sorted(raw_scores, key=_selection_key),
         eliminations=sorted(eliminations, key=lambda item: (item["model_id"], item["reasons"])),
         explanation={
             "task_id": task.task_id,
+            "role": task.role,
+            "pinned": False,
             "benchmark_version": task.benchmark_version,
+            "normalization_version": NORMALIZATION_VERSION,
             "quality_formula": "(0.60*external+0.30*local)/0.90",
+            "subscription_first_applied": subscription.applied,
+            "reseller_exception_required": subscription.reseller_exception_required,
+            "subscription_precedence_group": subscription.group,
             "pareto_frontier_model_ids": [
                 score.model.model_id
                 for score in sorted(frontier, key=lambda item: item.model.model_id)
@@ -247,6 +320,355 @@ def route_model(
             ),
         },
     )
+
+
+def _route_pinned_director(
+    task: TaskRequirements,
+    models: list[ModelCapabilities],
+    provider_by_id: dict[str, ProviderCapabilities],
+    history_by_model: dict[str, VerifiedHistory],
+    local_prior_successes: float,
+    local_prior_attempts: float,
+    external_weight: float,
+    local_weight: float,
+    fallback_failure_weight: float,
+) -> RoutingDecision:
+    """Route the Director to its configured frontier model, or to nothing at all.
+
+    There is deliberately no cheaper alternative and no automatic fallback. The
+    frontier model's job is to make the expensive decisions once so that cheap
+    models can execute many times; substituting a weaker model to save money
+    defeats the design, so a pinned route that fails its requirements is
+    reported as a refusal rather than quietly replaced.
+    """
+
+    if not task.pinned_model_id:
+        raise RoutingError(
+            "director role requires a pinned_model_id: the frontier model is configured, "
+            "not selected by score"
+        )
+
+    pinned = next(
+        (model for model in models if model.model_id == task.pinned_model_id),
+        None,
+    )
+    provider = provider_by_id.get(pinned.provider_id) if pinned else None
+    if pinned is None:
+        reasons = [f"pinned model {task.pinned_model_id!r} is not in the registry"]
+    else:
+        reasons = _hard_filter_reasons(task, pinned, provider)
+
+    base_explanation: dict[str, Any] = {
+        "task_id": task.task_id,
+        "role": "director",
+        "pinned": True,
+        "pinned_model_id": task.pinned_model_id,
+        "normalization_version": NORMALIZATION_VERSION,
+        "benchmark_version": task.benchmark_version,
+        "subscription_first_applied": False,
+        "reseller_exception_required": False,
+        "downgrade_permitted": False,
+    }
+
+    if pinned is None or provider is None or reasons:
+        return RoutingDecision(
+            selected=None,
+            candidates=[],
+            scored=[],
+            eliminations=[
+                {
+                    "model_id": task.pinned_model_id,
+                    "provider_id": pinned.provider_id if pinned else None,
+                    "reasons": reasons,
+                }
+            ],
+            explanation={
+                **base_explanation,
+                "pinned_route_rejected": reasons,
+                "selected_model_id": None,
+            },
+        )
+
+    score = _score_candidate(
+        task,
+        pinned,
+        provider,
+        history_by_model.get(pinned.model_id),
+        local_prior_successes,
+        local_prior_attempts,
+        external_weight,
+        local_weight,
+    )
+    # Pool of one: no fallback is attached, by design.
+    score = _attach_fallback(score, [score], fallback_failure_weight, task.max_attempts)
+    return RoutingDecision(
+        selected=score,
+        candidates=[score],
+        scored=[score],
+        eliminations=[],
+        explanation={**base_explanation, "selected_model_id": score.model.model_id},
+    )
+
+
+@dataclass(frozen=True)
+class _SubscriptionOutcome:
+    pool: list[CandidateScore]
+    eliminations: list[dict[str, Any]]
+    applied: bool
+    reseller_exception_required: bool
+    group: str | None
+
+
+def _apply_subscription_first(
+    task: TaskRequirements, scores: list[CandidateScore]
+) -> _SubscriptionOutcome:
+    """Prefer an already-paid-for route over a paid reseller route.
+
+    Precedence, applied only among candidates that already cleared every hard
+    requirement:
+
+    1. eligible direct subscription routes;
+    2. other eligible routes with zero marginal cost;
+    3. reseller routes.
+
+    The first non-empty group wins. Reaching group 3 is an exception worth
+    recording, because it means real money is being spent on capability the user
+    may already own. A reseller candidate that duplicates an eligible direct
+    route, by model ID or by equivalence class, is eliminated outright.
+    """
+
+    if not task.subscription_first or not scores:
+        return _SubscriptionOutcome(
+            pool=scores,
+            eliminations=[],
+            applied=False,
+            reseller_exception_required=False,
+            group=None,
+        )
+
+    direct = [score for score in scores if _is_direct_subscription(score)]
+    zero_cost = [
+        score
+        for score in scores
+        if not _is_direct_subscription(score)
+        and not _is_reseller(score)
+        and score.model.zero_marginal_cost
+    ]
+    other_direct = [
+        score
+        for score in scores
+        if not _is_direct_subscription(score)
+        and not _is_reseller(score)
+        and not score.model.zero_marginal_cost
+    ]
+    reseller = [score for score in scores if _is_reseller(score)]
+
+    eliminations: list[dict[str, Any]] = []
+    owned = [*direct, *zero_cost]
+    if owned:
+        for score in reseller:
+            duplicate_of = _duplicate_of(task, score, owned)
+            if duplicate_of is not None:
+                eliminations.append(
+                    {
+                        "model_id": score.model.model_id,
+                        "provider_id": score.provider.provider_id,
+                        "reasons": [
+                            "subscription-first: duplicates the eligible route "
+                            f"{duplicate_of}"
+                        ],
+                    }
+                )
+        eliminated_ids = {item["model_id"] for item in eliminations}
+        reseller = [
+            score for score in reseller if score.model.model_id not in eliminated_ids
+        ]
+
+    for group_name, group in (
+        ("direct_subscription", direct),
+        ("zero_marginal_cost", zero_cost),
+        ("other_direct", other_direct),
+        ("reseller", reseller),
+    ):
+        if group:
+            for score in scores:
+                if score in group or score.model.model_id in {
+                    item["model_id"] for item in eliminations
+                }:
+                    continue
+                eliminations.append(
+                    {
+                        "model_id": score.model.model_id,
+                        "provider_id": score.provider.provider_id,
+                        "reasons": [
+                            f"subscription-first: precedence group {group_name} is available"
+                        ],
+                    }
+                )
+            return _SubscriptionOutcome(
+                pool=group,
+                eliminations=eliminations,
+                applied=True,
+                reseller_exception_required=group_name == "reseller",
+                group=group_name,
+            )
+
+    return _SubscriptionOutcome(
+        pool=[],
+        eliminations=eliminations,
+        applied=True,
+        reseller_exception_required=False,
+        group=None,
+    )
+
+
+def _is_direct_subscription(score: CandidateScore) -> bool:
+    return score.provider.provider_class in DIRECT_SUBSCRIPTION_CLASSES
+
+
+def _is_reseller(score: CandidateScore) -> bool:
+    return score.provider.provider_class in RESELLER_CLASSES
+
+
+def _duplicate_of(
+    task: TaskRequirements, reseller: CandidateScore, owned: list[CandidateScore]
+) -> str | None:
+    """Return the owned route a reseller candidate duplicates, if any.
+
+    Two routes are duplicates when they name the same model, or when they share
+    an equivalence class, which is how "materially equivalent capability" is
+    expressed. The unit's own `equivalence_class` widens the match when the
+    registry labels only one side of the pair.
+    """
+
+    def keys(score: CandidateScore) -> set[str]:
+        return {
+            key
+            for key in (score.model.model_id, score.model.equivalence_class)
+            if key
+        }
+
+    reseller_keys = keys(reseller)
+    if task.equivalence_class and task.equivalence_class in reseller_keys:
+        reseller_keys.add(task.equivalence_class)
+
+    for candidate in sorted(owned, key=lambda item: item.model.model_id):
+        if reseller_keys & keys(candidate):
+            return candidate.model.model_id
+    return None
+
+
+def build_route_receipt(
+    task: TaskRequirements,
+    decision: RoutingDecision,
+    *,
+    registry_timestamp: str,
+    evidence_freshness: str = "cache",
+) -> dict[str, Any]:
+    """Build the receipt that must accompany every route assignment.
+
+    A route without a receipt is a guess. The receipt records what was
+    considered, what was disqualified and why, the score inputs, the choice, the
+    fallback, and the freshness of the evidence behind all of it.
+    """
+
+    if evidence_freshness not in {"network", "cache", "stale_cache"}:
+        raise RoutingError(
+            f"unknown evidence_freshness {evidence_freshness!r}; "
+            "expected network, cache, or stale_cache"
+        )
+
+    selected = decision.selected
+    fallback_id = selected.fallback_model_id if selected else None
+    fallback_provider = None
+    if fallback_id:
+        fallback_provider = next(
+            (
+                score.provider.provider_id
+                for score in decision.scored
+                if score.model.model_id == fallback_id
+            ),
+            None,
+        )
+
+    considered = decision.scored or decision.candidates
+    return {
+        "receipt_contract": "graph-coder/route_receipt/v1",
+        "node_id": task.task_id,
+        "role": task.role,
+        "considered_routes": [
+            {
+                "model": score.model.model_id,
+                "provider": score.provider.provider_id,
+                "quality": score.quality,
+                "attempt_cost": score.model.per_attempt_cost,
+                "expected_passing_cost": score.expected_passing_cost,
+            }
+            for score in considered
+        ],
+        "disqualifications": [
+            {
+                "model": item["model_id"],
+                "provider": item.get("provider_id"),
+                "reasons": item["reasons"],
+            }
+            for item in decision.eliminations
+        ],
+        "score_inputs": {
+            "benchmark_weights": dict(sorted(task.benchmark_weights.items())),
+            "benchmark_version": task.benchmark_version,
+            "normalization_version": NORMALIZATION_VERSION,
+            "quality_formula": "(0.60*external+0.30*local)/0.90",
+            "quality_floor": task.quality_floor,
+            "repair_cost_factor": task.repair_cost_factor,
+            "escalation_cost": task.escalation_cost,
+        },
+        "chosen_route": (
+            {
+                "model": selected.model.model_id,
+                "provider": selected.provider.provider_id,
+                "expected_passing_cost": selected.expected_passing_cost,
+            }
+            if selected
+            else None
+        ),
+        "fallback_route": (
+            {"model": fallback_id, "provider": fallback_provider} if fallback_id else None
+        ),
+        "subscription_first_applied": bool(
+            decision.explanation.get("subscription_first_applied", False)
+        ),
+        "reseller_exception_required": bool(
+            decision.explanation.get("reseller_exception_required", False)
+        ),
+        "subscription_precedence_group": decision.explanation.get(
+            "subscription_precedence_group"
+        ),
+        "open_weight_preference_effect": (
+            "applied"
+            if decision.explanation.get("open_weight_preference_applied")
+            else "not applied"
+        ),
+        "pinned": bool(decision.explanation.get("pinned", False)),
+        "pinned_route_rejected": decision.explanation.get("pinned_route_rejected"),
+        "registry_timestamp": registry_timestamp,
+        "evidence_freshness": evidence_freshness,
+        "tie_breakers_used": [
+            "expected_passing_cost",
+            "evidence_confidence",
+            "provider_reliability",
+            "latency",
+            "model_id",
+        ],
+        "escalation_conditions": [
+            "verification failure",
+            "repeated tool-use failure",
+            "context overflow",
+            "provider unavailability",
+            "raised task risk or capability",
+            "capability-attributable review failure",
+        ],
+    }
 
 
 def _hard_filter_reasons(
@@ -315,7 +737,25 @@ def _score_candidate(
         else 0.0
     )
     pass_probability = quality * _bounded(provider.reliability)
-    expected_cost = _expected_cost(model.per_attempt_cost, pass_probability, task.max_attempts)
+    attempt_cost = _expected_cost(model.per_attempt_cost, pass_probability, task.max_attempts)
+
+    # expected_passing_cost = attempt_cost
+    #                       + probability_of_repair    * repair_cost
+    #                       + probability_of_escalation * escalation_cost
+    #
+    # The repair and escalation terms use configured estimates. They default to
+    # zero so an unconfigured registry never implies precision it does not have.
+    probability_of_repair = _bounded(1.0 - pass_probability)
+    repair_cost = model.per_attempt_cost * max(0.0, task.repair_cost_factor)
+    probability_of_escalation = _bounded(
+        (1.0 - pass_probability) ** max(1, task.max_attempts)
+    )
+    escalation_cost = max(0.0, task.escalation_cost)
+    expected_cost = (
+        attempt_cost
+        + probability_of_repair * repair_cost
+        + probability_of_escalation * escalation_cost
+    )
     return CandidateScore(
         model=model,
         provider=provider,
@@ -328,11 +768,17 @@ def _score_candidate(
             "model": asdict(model),
             "provider": asdict(provider),
             "benchmark_version": task.benchmark_version,
+            "normalization_version": NORMALIZATION_VERSION,
             "benchmark_weights": dict(sorted(task.benchmark_weights.items())),
             "external_score": round(external, 12),
             "local_score": round(local, 12),
             "quality": round(quality, 12),
             "provider_adjusted_pass_probability": round(pass_probability, 12),
+            "attempt_cost": round(attempt_cost, 12),
+            "probability_of_repair": round(probability_of_repair, 12),
+            "repair_cost": round(repair_cost, 12),
+            "probability_of_escalation": round(probability_of_escalation, 12),
+            "escalation_cost": round(escalation_cost, 12),
             "expected_passing_cost": round(expected_cost, 12),
         },
     )

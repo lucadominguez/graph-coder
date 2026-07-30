@@ -21,7 +21,9 @@ class TerminalLayout:
         return [list(command) for command in self.commands]
 
 
-def build_windows_terminal_layout(root: str | Path, graph_coder_command: str = "aps") -> TerminalLayout:
+def build_windows_terminal_layout(
+    root: str | Path, graph_coder_command: str = "graph-coder"
+) -> TerminalLayout:
     project = str(Path(root).resolve())
     commands = (
         ("wt.exe", "new-tab", "--title", "Graph Coder Director", "-d", project),

@@ -99,17 +99,18 @@ def load_lock(path: str | Path) -> UpstreamLock:
     if not isinstance(upstream, dict):
         raise UpstreamLockError("lock file is missing the 'upstream' object")
 
-    missing = [key for key in ("repository_url", "commit", "branch", "license") if not upstream.get(key)]
+    required = ("repository_url", "commit", "branch", "license")
+    missing = [key for key in required if not upstream.get(key)]
     if missing:
         raise UpstreamLockError(f"lock file is missing upstream fields: {', '.join(missing)}")
 
-    commit = str(upstream["commit"])
-    if len(commit) != 40 or any(character not in "0123456789abcdef" for character in commit.lower()):
+    commit = str(upstream["commit"]).lower()
+    if len(commit) != 40 or any(character not in "0123456789abcdef" for character in commit):
         raise UpstreamLockError(f"upstream.commit must be a full 40-character sha: {commit!r}")
 
     return UpstreamLock(
         repository_url=str(upstream["repository_url"]),
-        commit=commit.lower(),
+        commit=commit,
         branch=str(upstream["branch"]),
         license=str(upstream["license"]),
         inspected_at=str(raw.get("inspected_at", "")),

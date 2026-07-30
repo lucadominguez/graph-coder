@@ -1,0 +1,62 @@
+[
+  {
+    "name": "same model direct beats reseller",
+    "user_constraint": null,
+    "candidates": [
+      {"id": "openai-api:gpt-5.5", "provider_class": "direct_oauth", "model": "gpt-5.5", "available": true, "capable": true, "zero_marginal_cost": true},
+      {"id": "openrouter:openai/gpt-5.5", "provider_class": "reseller", "model": "gpt-5.5", "available": true, "capable": true, "zero_marginal_cost": false}
+    ],
+    "expected": "openai-api:gpt-5.5",
+    "reseller_exception_required": false
+  },
+  {
+    "name": "equivalent direct capability beats paid reseller",
+    "user_constraint": null,
+    "candidates": [
+      {"id": "claude-api:claude-sonnet-5", "provider_class": "direct_oauth", "model": "claude-sonnet-5", "available": true, "capable": true, "equivalence": "high-risk-review", "zero_marginal_cost": true},
+      {"id": "openrouter:anthropic/claude-opus-5", "provider_class": "reseller", "model": "claude-opus-5", "available": true, "capable": true, "equivalence": "high-risk-review", "zero_marginal_cost": false}
+    ],
+    "expected": "claude-api:claude-sonnet-5",
+    "reseller_exception_required": false
+  },
+  {
+    "name": "unavailable direct permits recorded paid fallback",
+    "user_constraint": null,
+    "candidates": [
+      {"id": "openai-api:gpt-5.5", "provider_class": "direct_oauth", "model": "gpt-5.5", "available": false, "capable": true, "zero_marginal_cost": true},
+      {"id": "openrouter:openai/gpt-5.5", "provider_class": "reseller", "model": "gpt-5.5", "available": true, "capable": true, "zero_marginal_cost": false}
+    ],
+    "expected": "openrouter:openai/gpt-5.5",
+    "reseller_exception_required": true
+  },
+  {
+    "name": "reseller-only hard capability may win",
+    "user_constraint": null,
+    "candidates": [
+      {"id": "openai-api:gpt-5.4-mini", "provider_class": "direct_oauth", "model": "gpt-5.4-mini", "available": true, "capable": false, "zero_marginal_cost": true},
+      {"id": "openrouter:perplexity/sonar-pro-search", "provider_class": "reseller", "model": "sonar-pro-search", "available": true, "capable": true, "zero_marginal_cost": false}
+    ],
+    "expected": "openrouter:perplexity/sonar-pro-search",
+    "reseller_exception_required": true
+  },
+  {
+    "name": "explicit user constraint wins when eligible",
+    "user_constraint": "openrouter:qwen/qwen3.7-flash",
+    "candidates": [
+      {"id": "openai-api:gpt-5.5", "provider_class": "direct_oauth", "model": "gpt-5.5", "available": true, "capable": true, "zero_marginal_cost": true},
+      {"id": "openrouter:qwen/qwen3.7-flash", "provider_class": "reseller", "model": "qwen3.7-flash", "available": true, "capable": true, "zero_marginal_cost": false}
+    ],
+    "expected": "openrouter:qwen/qwen3.7-flash",
+    "reseller_exception_required": true
+  },
+  {
+    "name": "unavailable routes are never selected",
+    "user_constraint": null,
+    "candidates": [
+      {"id": "claude-api:claude-opus-5", "provider_class": "direct_oauth", "model": "claude-opus-5", "available": false, "capable": true, "zero_marginal_cost": true},
+      {"id": "workweave:auto", "provider_class": "zero_cost_other", "model": "auto", "available": true, "capable": true, "zero_marginal_cost": true}
+    ],
+    "expected": "workweave:auto",
+    "reseller_exception_required": false
+  }
+]

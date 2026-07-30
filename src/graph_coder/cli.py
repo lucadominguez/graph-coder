@@ -10,6 +10,7 @@ import sqlite3
 import sys
 from collections.abc import Callable, Sequence
 from dataclasses import asdict, is_dataclass
+from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -26,7 +27,7 @@ from .config import (
 from .context import compact_context
 from .contracts import load_schema
 from .db import connect, migrate, transaction
-from .errors import GraphCoderError, ContractError
+from .errors import ContractError, GraphCoderError
 from .events import append_event, rebuild_projections, verify_chain
 from .graph import (
     ArtifactRef,
@@ -54,6 +55,7 @@ from .routing import (
     RoutingDecision,
     TaskRequirements,
     VerifiedHistory,
+    build_route_receipt,
     route_model,
 )
 from .terminal import build_windows_terminal_layout, open_windows_terminal
@@ -584,7 +586,7 @@ def _frozenset_fields(payload: dict[str, Any], fields: Sequence[str]) -> dict[st
     return value
 
 
-def _route_from_payload(payload: dict[str, Any]) -> RoutingDecision:
+def _route_from_payload(payload: dict[str, Any]) -> tuple[TaskRequirements, RoutingDecision]:
     task = TaskRequirements(
         **_frozenset_fields(
             payload["task"],
@@ -610,7 +612,7 @@ def _route_from_payload(payload: dict[str, Any]) -> RoutingDecision:
         for item in payload["providers"]
     ]
     history = [VerifiedHistory(**item) for item in payload.get("history", [])]
-    return route_model(task, models, providers, history)
+    return task, route_model(task, models, providers, history)
 
 
 def _decision_payload(decision: Any) -> JsonObject:
@@ -622,11 +624,30 @@ def _decision_payload(decision: Any) -> JsonObject:
     }
 
 
+def _receipt_for(
+    task: TaskRequirements, decision: RoutingDecision, payload: dict[str, Any]
+) -> JsonObject:
+    """Build the route receipt that must accompany every assignment."""
+
+    return build_route_receipt(
+        task,
+        decision,
+        registry_timestamp=str(
+            payload.get("registry_timestamp")
+            or datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
+        ),
+        evidence_freshness=str(payload.get("evidence_freshness", "cache")),
+    )
+
+
 def _cmd_route_assign(args: argparse.Namespace) -> JsonObject:
     source = _read_json(args.input)
-    decision = _route_from_payload(source)
+    task, decision = _route_from_payload(source)
+    receipt = _receipt_for(task, decision, source)
     if decision.selected is None:
-        return {"ok": False, **_decision_payload(decision)}
+        # A refusal still gets a receipt: the disqualification reasons are the
+        # whole point of asking.
+        return {"ok": False, **_decision_payload(decision), "receipt": receipt}
     plan_id = getattr(args, "plan_id", None) or source.get("plan_id")
     unit_id = (
         getattr(args, "unit_id", None) or source.get("unit_id") or source["task"].get("task_id")
@@ -696,6 +717,7 @@ def _cmd_route_assign(args: argparse.Namespace) -> JsonObject:
     payload = {
         "ok": True,
         **_decision_payload(decision),
+        "receipt": receipt,
         "persisted": persisted,
         "event_sequence": event_sequence,
     }
@@ -705,8 +727,13 @@ def _cmd_route_assign(args: argparse.Namespace) -> JsonObject:
 
 
 def _cmd_route_explain(args: argparse.Namespace) -> JsonObject:
-    decision = _route_from_payload(_read_json(args.input))
-    payload = {"ok": decision.selected is not None, **_decision_payload(decision)}
+    source = _read_json(args.input)
+    task, decision = _route_from_payload(source)
+    payload = {
+        "ok": decision.selected is not None,
+        **_decision_payload(decision),
+        "receipt": _receipt_for(task, decision, source),
+    }
     if args.output:
         _write_json(args.output, payload)
     return payload
@@ -815,7 +842,9 @@ def _cmd_jcode_emit(args: argparse.Namespace) -> JsonObject:
 
 
 def _cmd_terminal_open(args: argparse.Namespace) -> JsonObject:
-    layout = build_windows_terminal_layout(_root(args), graph_coder_command=args.graph_coder_command)
+    layout = build_windows_terminal_layout(
+        _root(args), graph_coder_command=args.graph_coder_command
+    )
     processes = open_windows_terminal(layout, execute=args.execute)
     return {
         "ok": True,
