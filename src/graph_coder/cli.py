@@ -34,6 +34,7 @@ from .graph import (
     ExecutionGraph,
     GraphNode,
     Limits,
+    NodeAuthority,
     NodeKind,
     NodeRole,
     ReviewPolicy,
@@ -396,17 +397,28 @@ def _graph_from_plan(path: Path) -> ExecutionGraph:
     }
     gate = plan.metadata.get("release_gate", {})
     graph_id = f"G-{plan.plan_id}-v{plan.metadata['plan_version']}"
+    # One advisory manager per declared manager_id, never one per worker. Each
+    # manager owns a coherent branch and reviews only the units inside it.
+    units_by_manager: dict[str, list[str]] = {}
+    for unit in plan.units:
+        manager_id = unit.manager_id or "M-DEFAULT"
+        units_by_manager.setdefault(manager_id, []).append(unit.unit_id)
+    manager_ids = sorted(units_by_manager)
+
     nodes = [
         GraphNode(
             id="Director",
             kind=NodeKind.INTEGRATE,
             title="Graph Coder Director",
             prompt=(
-                "Preserve the approved plan and coordinate only through public swarm operations."
+                "Direct, advise, and review branch outputs. Never edit implementation files "
+                "and never complete a failed worker's task yourself. Coordinate only through "
+                "public swarm operations."
             ),
             role=NodeRole.COMPOSITE,
+            authority=NodeAuthority.ADVISORY_ONLY,
             route=RouteSpec(adapter="jcode"),
-            children=sorted(ids),
+            children=manager_ids,
             parent_owner=None,
             metadata={
                 "graph_id": graph_id,
@@ -415,6 +427,28 @@ def _graph_from_plan(path: Path) -> ExecutionGraph:
             },
         )
     ]
+    nodes.extend(
+        GraphNode(
+            id=manager_id,
+            kind=NodeKind.MANAGE,
+            title=f"Manage branch {manager_id}",
+            prompt=(
+                f"Advise and review the units in {manager_id}. You have no write scope: "
+                "you may not edit files, run a repair yourself, or mark work complete "
+                "without evidence. Delegate repairs to a worker and escalate what you "
+                "cannot resolve."
+            ),
+            role=NodeRole.COMPOSITE,
+            authority=NodeAuthority.ADVISORY_ONLY,
+            review_owner="Director",
+            parent_owner="Director",
+            children=sorted(units_by_manager[manager_id]),
+            write_scopes=[],
+            route=RouteSpec(adapter="jcode"),
+            metadata={"graph_id": graph_id, "reviews": sorted(units_by_manager[manager_id])},
+        )
+        for manager_id in manager_ids
+    )
     for unit in plan.units:
         missing = set(unit.dependencies) - ids
         if missing:
@@ -426,7 +460,9 @@ def _graph_from_plan(path: Path) -> ExecutionGraph:
                 title=unit.title or unit.objective,
                 prompt=_unit_prompt(unit),
                 unit_ids=[unit.unit_id],
-                parent_owner="Director",
+                parent_owner=unit.manager_id or "M-DEFAULT",
+                authority=NodeAuthority.IMPLEMENTATION,
+                review_owner=unit.manager_id or "M-DEFAULT",
                 depends_on=list(unit.dependencies),
                 artifact_inputs=[
                     ArtifactRef(
@@ -441,8 +477,8 @@ def _graph_from_plan(path: Path) -> ExecutionGraph:
                 write_scopes=list(unit.write_scope),
                 acceptance=list(unit.acceptance),
                 review=ReviewPolicy(
-                    required=bool(unit.reviewer),
-                    reviewers=[unit.reviewer] if unit.reviewer else [],
+                    required=True,
+                    reviewers=[unit.manager_id] if unit.manager_id else [],
                     checklist=[*unit.forward_proof, *unit.regression_proof],
                 ),
                 route=RouteSpec(

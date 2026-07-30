@@ -152,7 +152,13 @@ def test_cli_persists_plan_graph_route_and_emits_jcode_bundle(tmp_path, capsys) 
         assert connection.execute("SELECT count(*) FROM plan_versions").fetchone()[0] == 1
         assert connection.execute("SELECT count(*) FROM requirements").fetchone()[0] == 1
         assert connection.execute("SELECT count(*) FROM units").fetchone()[0] == 1
-        assert connection.execute("SELECT count(*) FROM graph_nodes").fetchone()[0] == 2
+        # Director, one advisory manager, and the single worker it reviews.
+        assert connection.execute("SELECT count(*) FROM graph_nodes").fetchone()[0] == 3
+        manager = connection.execute(
+            "SELECT node_id,node_type,write_scope_json FROM graph_nodes WHERE node_type='manage'"
+        ).fetchone()
+        assert manager["node_id"] == "M-CONTRACTS"
+        assert manager["write_scope_json"] == "[]"
         assert connection.execute("SELECT primary_model FROM routes").fetchone()[0] == "open/test"
         approved = connection.execute(
             """SELECT plan_id,repository_commit,artifact_hashes_json

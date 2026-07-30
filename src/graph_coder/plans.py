@@ -15,33 +15,60 @@ import yaml
 
 from .contracts import CONTRACT_VERSION, ContractValidationError
 
-REQUIREMENTS_READY_HEADINGS = (
+#: The sixteen canonical plan sections, in order. There is deliberately no
+#: Product Contract section: concept and requirements belong in the plan itself,
+#: not in a parallel document that can drift away from it.
+CANONICAL_SECTIONS = (
     "Goal Capsule",
-    "Product Contract",
-    "Planning Contract",
-    "Sources and Evidence",
-)
-IMPLEMENTATION_READY_HEADINGS = (
-    "Goal Capsule",
-    "Product Contract",
-    "Planning Contract",
+    "Concept and Requirements",
+    "Scope and Non-Goals",
+    "Acceptance and Invariants",
+    "Repository Grounding",
+    "Technical Research",
+    "Technical Decisions",
     "System Impact",
-    "Implementation Units",
-    "Execution Graph",
+    "Canonical Implementation Units",
+    "Delegation Graph",
     "Routing Assignments",
+    "Context Contract",
     "Verification Contract",
     "Failure and Recovery Contract",
     "Definition of Done",
     "Sources and Evidence",
 )
+
+#: A concept-stage plan needs the sections that concept grilling actually fills.
+#: The rest are declared later, as the plan grows.
+REQUIREMENTS_READY_HEADINGS = (
+    "Goal Capsule",
+    "Concept and Requirements",
+    "Scope and Non-Goals",
+    "Acceptance and Invariants",
+    "Sources and Evidence",
+)
+IMPLEMENTATION_READY_HEADINGS = CANONICAL_SECTIONS
+
+#: Sections that must never disappear once written. Removing one is a material
+#: regression, not an edit.
+FORBIDDEN_TO_REMOVE = REQUIREMENTS_READY_HEADINGS
+
 READINESS_VALUES = {"requirements-ready", "implementation-ready"}
-_COMPLETED = {"completed", "done"}
+
+#: `done` is not accepted. It was the APS spelling for a self-declared finish;
+#: in Graph Coder a unit is only complete once its manager passed it.
+_COMPLETED = {"completed"}
+
+#: The hashes an approval is bound to. Any of them changing voids the approval.
+APPROVAL_HASHES = ("plan_hash", "graph_hash", "route_hash", "render_hash")
+
 ID_PATTERNS = {
     "plan": re.compile(r"^P-[A-Za-z0-9][A-Za-z0-9._-]*$"),
     "requirement": re.compile(r"^R-[A-Za-z0-9][A-Za-z0-9._-]*$"),
     "acceptance": re.compile(r"^AE-[A-Za-z0-9][A-Za-z0-9._-]*$"),
     "invariant": re.compile(r"^I-[A-Za-z0-9][A-Za-z0-9._-]*$"),
-    "unit": re.compile(r"^U-[A-Za-z0-9][A-Za-z0-9._-]*$"),
+    # Both prefixes are accepted: IU- is canonical, U- is the APS spelling and
+    # stays valid so ported plans keep their stable unit identities.
+    "unit": re.compile(r"^(IU|U)-[A-Za-z0-9][A-Za-z0-9._-]*$"),
 }
 
 
@@ -75,9 +102,15 @@ class ImplementationUnit:
     fallback_route: str | None = None
     attempt_limit: int = 2
     escalation_conditions: tuple[str, ...] = ()
-    reviewer: str = ""
     stop_conditions: tuple[str, ...] = ()
     completion_evidence: tuple[str, ...] = ()
+    #: The manager that owns this unit's review. It replaces APS's `reviewer`
+    #: field: there are no reviewer agents beneath workers.
+    manager_id: str = ""
+    review_contract: dict[str, Any] = field(default_factory=dict)
+    context_manifest: dict[str, Any] = field(default_factory=dict)
+    retry_policy: dict[str, Any] = field(default_factory=dict)
+    failure_domain: str = "node"
 
     def with_hash(self) -> ImplementationUnit:
         return replace(self, semantic_hash=semantic_unit_hash(self))
@@ -279,6 +312,24 @@ def _require_metadata(metadata: dict[str, Any]) -> None:
         raise ContractValidationError("approved must be boolean")
     if metadata["approved"] and metadata["artifact_readiness"] != "implementation-ready":
         raise ContractValidationError("only implementation-ready plans may be approved")
+    if metadata["approved"]:
+        # An approval that is not bound to hashes cannot be invalidated by a
+        # material change, which makes it worthless as a gate.
+        approval = metadata.get("approval")
+        if not isinstance(approval, dict):
+            raise ContractValidationError(
+                "an approved plan must record an approval bound to "
+                + ", ".join(APPROVAL_HASHES)
+            )
+        missing = [name for name in APPROVAL_HASHES if not approval.get(name)]
+        if missing:
+            raise ContractValidationError(
+                "approval is missing required hashes: " + ", ".join(missing)
+            )
+        if approval.get("rendered_full_plan") is not True:
+            raise ContractValidationError(
+                "approval requires rendered_full_plan: true; a summary is not an approval view"
+            )
 
 
 def _extract_headings(body: str) -> dict[str, str]:
@@ -323,7 +374,11 @@ def _unit_from_mapping(item: dict[str, Any]) -> ImplementationUnit:
         fallback_route=item.get("fallback_route"),
         attempt_limit=int(item.get("attempt_limit", 2)),
         escalation_conditions=_strings(item, "escalation_conditions"),
-        reviewer=str(item.get("reviewer", "")),
+        manager_id=str(item.get("manager_id", "")),
+        review_contract=dict(item.get("review_contract", {})),
+        context_manifest=dict(item.get("context_manifest", {})),
+        retry_policy=dict(item.get("retry_policy", {})),
+        failure_domain=str(item.get("failure_domain", "node")),
         stop_conditions=_strings(item, "stop_conditions"),
         completion_evidence=_strings(item, "completion_evidence"),
         status=str(item.get("status", "pending")),
@@ -340,21 +395,72 @@ def sha256_text(value: str) -> str:
 
 
 def semantic_unit_hash(unit: ImplementationUnit | dict[str, Any]) -> str:
-    if isinstance(unit, ImplementationUnit):
-        payload = {
-            "objective": unit.objective,
-            "acceptance": sorted(unit.acceptance),
-            "dependencies": sorted(unit.dependencies),
-            "write_scope": sorted(unit.write_scope),
-        }
-    else:
-        payload = {
-            "objective": unit.get("objective", ""),
-            "acceptance": sorted(unit.get("acceptance", ())),
-            "dependencies": sorted(unit.get("dependencies", ())),
-            "write_scope": sorted(unit.get("write_scope", ())),
-        }
+    """Hash everything that changes what a worker is asked to do.
+
+    Covered: objective, acceptance, dependencies, interfaces, read and write and
+    forbidden scopes, commands, expected artifacts, the manager and review
+    contract, the context manifest, and routing constraints.
+
+    Deliberately not covered: titles, rationale, prose, ordering, and formatting.
+    An editorial pass must not invalidate an approval, and a changed write scope
+    must.
+    """
+
+    def get(name: str, default: Any = "") -> Any:
+        if isinstance(unit, ImplementationUnit):
+            return getattr(unit, name, default)
+        return unit.get(name, default)
+
+    def sorted_strings(name: str) -> list[str]:
+        return sorted(str(value) for value in (get(name, ()) or ()))
+
+    payload = {
+        "objective": str(get("objective")),
+        "acceptance": sorted_strings("acceptance"),
+        "dependencies": sorted_strings("dependencies"),
+        "interfaces": sorted_strings("interfaces"),
+        "read_scope": sorted_strings("read_scope"),
+        "write_scope": sorted_strings("write_scope"),
+        "forbidden_scope": sorted_strings("forbidden_scope"),
+        "commands": sorted_strings("commands"),
+        "output_artifacts": sorted_strings("output_artifacts"),
+        "manager_id": str(get("manager_id")),
+        "review_contract": get("review_contract", {}) or {},
+        "context_manifest": get("context_manifest", {}) or {},
+        "retry_policy": get("retry_policy", {}) or {},
+        "routing": {
+            "primary_route": get("primary_route", None),
+            "fallback_route": get("fallback_route", None),
+            "attempt_limit": get("attempt_limit", 2),
+        },
+    }
     return "U-" + sha256_text(canonical_json(payload))[:24]
+
+
+def approval_binding(plan: PlanDocument) -> dict[str, str]:
+    """The four hashes an approval is bound to, as recorded in the plan."""
+
+    approval = plan.metadata.get("approval", {})
+    if not isinstance(approval, dict):
+        raise ContractValidationError("approval must be a mapping")
+    return {name: str(approval.get(name, "")) for name in APPROVAL_HASHES}
+
+
+def approval_is_valid(plan: PlanDocument, current: dict[str, str]) -> tuple[bool, list[str]]:
+    """Compare a recorded approval with current state.
+
+    Returns whether the approval still holds and which hashes moved. A single
+    changed hash voids the approval: the user approved a specific plan, graph,
+    routing table, and rendering, not the idea of them.
+    """
+
+    recorded = approval_binding(plan)
+    drifted = [
+        name
+        for name in APPROVAL_HASHES
+        if name in current and current[name] and recorded[name] != current[name]
+    ]
+    return (not drifted and bool(plan.metadata.get("approved"))), drifted
 
 
 def create_snapshot(plan: PlanDocument, store: SnapshotStore) -> Snapshot:
@@ -455,13 +561,21 @@ def collect_readiness_defects(plan: PlanDocument) -> list[str]:
             "regression proof": unit.regression_proof,
             "commands": unit.commands,
             "output artifacts": unit.output_artifacts,
-            "reviewer": (unit.reviewer,),
+            "manager_id": (unit.manager_id,),
+            "review contract": unit.review_contract,
+            "context manifest": unit.context_manifest,
+            "retry policy": unit.retry_policy,
             "STOP conditions": unit.stop_conditions,
             "completion evidence": unit.completion_evidence,
         }
         for field_name, value in required_fields.items():
             if not value:
                 defects.append(f"unit {unit.unit_id} missing {field_name}")
+        if unit.retry_policy and unit.retry_policy.get("then") != "human_required":
+            defects.append(
+                f"unit {unit.unit_id} retry policy must end in human_required, "
+                "not an unbounded retry"
+            )
         unknown_dependencies = set(unit.dependencies) - unit_ids
         if unknown_dependencies:
             defects.append(
