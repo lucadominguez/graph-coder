@@ -5,7 +5,7 @@
   "additionalProperties": false,
   "required": ["artifact_contract", "artifact_type", "id", "version", "content_hash", "metadata", "requirements", "acceptance_examples", "invariants", "units"],
   "properties": {
-    "artifact_contract": {"const": "agent-planning-system/v1"},
+    "artifact_contract": {"const": "graph-coder/v1"},
     "artifact_type": {"const": "plan"},
     "id": {"type": "string", "pattern": "^P-[A-Za-z0-9][A-Za-z0-9._-]*$"},
     "version": {"type": "integer", "minimum": 1},

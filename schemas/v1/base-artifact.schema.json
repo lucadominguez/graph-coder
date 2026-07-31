@@ -6,7 +6,7 @@
       "type": "object",
       "required": ["artifact_contract", "artifact_type", "id", "version"],
       "properties": {
-        "artifact_contract": {"const": "agent-planning-system/v1"},
+        "artifact_contract": {"const": "graph-coder/v1"},
         "artifact_type": {"type": "string"},
         "id": {"type": "string", "minLength": 1},
         "version": {"type": "integer", "minimum": 1}

@@ -1,0 +1,28 @@
+{
+  "plan_id": "P-example",
+  "unit_id": "IU-ENDPOINT",
+  "task": {
+    "task_id": "IU-ENDPOINT",
+    "role": "worker",
+    "subscription_first": true,
+    "requires_auth": true,
+    "required_tools": ["edit", "read"],
+    "environment": "production",
+    "quality_floor": 0.45,
+    "min_confidence": 0.3,
+    "max_attempts": 2,
+    "repair_cost_factor": 0.35,
+    "escalation_cost": 1.25,
+    "benchmark_weights": {
+      "code": 0.5,
+      "tool_calling": 0.3,
+      "frontend_development": 0.2
+    }
+  },
+  "registry": {
+    "subscription_provider_ids": ["anthropic"],
+    "context_window_overrides": {},
+    "input_tokens_per_attempt": 40000,
+    "output_tokens_per_attempt": 8000
+  }
+}

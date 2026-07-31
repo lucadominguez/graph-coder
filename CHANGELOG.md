@@ -47,11 +47,25 @@ identities renamed and provenance recorded before any behavior changed.
 - **`docs/schematic.md`**: a text-art schematic of the whole system, from the
   skill/code split through the lifecycle, hierarchy, state machine, routing, and
   durability.
+- **`docs/plans/example-plan.md`**: a complete worked plan, four units under two
+  advisory managers with one dependency chain, that the README quickstart runs
+  against. A test validates and compiles it, so the quickstart cannot rot into
+  pointing at a file that does not exist.
+- **`docs/plans/example-route-request.json`**: a working routing request for the
+  example plan's endpoint unit.
 
 ### Changed
 
 - Package `agent_planning_system` is now `graph_coder`; the CLI `aps` is now
   `graph-coder`; the state directory `.agent-planning` is now `.graph-coder`.
+- Native artifacts declare `graph-coder/v1`, not `agent-planning-system/v1`. The
+  rebrand had reached the package, the CLI, and the state directory but not the
+  artifact contract, so a compiled graph still announced itself as APS. The frozen
+  copies under `schemas/import/aps-v1/` are unchanged and still validate genuine
+  APS artifacts, which no native reader accepts.
+- Every CLI failure is JSON with exit 2. `KeyError` and `TypeError` escaped as
+  tracebacks with exit 1, which was reachable from any hand-authored
+  `route assign --input` payload with a missing or misspelled field.
 - The canonical plan has 16 sections. The unit contract replaces `reviewer` with
   `manager_id` and adds `review_contract`, `context_manifest`, `retry_policy`, and
   `failure_domain`.

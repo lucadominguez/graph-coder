@@ -135,7 +135,7 @@ SCHEMA = [
     )""",
     """CREATE TABLE IF NOT EXISTS events (
         sequence INTEGER PRIMARY KEY AUTOINCREMENT,
-        schema_version TEXT NOT NULL DEFAULT 'agent-planning-system/v1',
+        schema_version TEXT NOT NULL DEFAULT 'graph-coder/v1',
         event_id TEXT NOT NULL UNIQUE,
         idempotency_key TEXT UNIQUE,
         run_id TEXT,

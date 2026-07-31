@@ -297,7 +297,7 @@ def _require_metadata(metadata: dict[str, Any]) -> None:
     if missing:
         raise ContractValidationError("required frontmatter missing: " + ", ".join(missing))
     if metadata["artifact_contract"] != CONTRACT_VERSION:
-        raise ContractValidationError("artifact_contract must be agent-planning-system/v1")
+        raise ContractValidationError("artifact_contract must be graph-coder/v1")
     if metadata["artifact_readiness"] not in READINESS_VALUES:
         raise ContractValidationError(
             "artifact_readiness must be requirements-ready or implementation-ready"

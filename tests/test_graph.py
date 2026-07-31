@@ -66,7 +66,7 @@ def test_json_roundtrip_preserves_v1_fields() -> None:
 
     loaded = ExecutionGraph.from_json(graph.to_json())
 
-    assert loaded.schema_version == "agent-planning-system/v1"
+    assert loaded.schema_version == "graph-coder/v1"
     assert [n.kind for n in loaded.nodes[1:]] == [NodeKind(kind) for kind in kinds]
     assert loaded.nodes[1].role == NodeRole.COMPOSITE
     assert loaded.nodes[2].artifact_outputs[0].producer == "n1"

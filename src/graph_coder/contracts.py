@@ -10,7 +10,7 @@ from typing import Any, Literal, cast
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError
 
-CONTRACT_VERSION = "agent-planning-system/v1"
+CONTRACT_VERSION = "graph-coder/v1"
 ArtifactKind = Literal[
     "plan",
     "graph",

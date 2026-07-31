@@ -4,7 +4,7 @@
   "type": "object", "additionalProperties": false,
   "required": ["artifact_contract", "artifact_type", "id", "version", "plan_id", "plan_version", "graph_id", "graph_version", "node_id", "unit_id", "attempt", "objective", "input_artifacts", "instructions", "inspect_targets", "read_scope", "write_scope", "forbidden_scope", "acceptance", "verification_commands", "stop_conditions", "report_schema"],
   "properties": {
-    "artifact_contract": {"const": "agent-planning-system/v1"}, "artifact_type": {"const": "task_packet"}, "id": {"type": "string", "minLength": 1}, "version": {"type": "integer", "minimum": 1},
+    "artifact_contract": {"const": "graph-coder/v1"}, "artifact_type": {"const": "task_packet"}, "id": {"type": "string", "minLength": 1}, "version": {"type": "integer", "minimum": 1},
     "plan_id": {"type": "string", "pattern": "^P-"}, "plan_version": {"type": "integer", "minimum": 1}, "graph_id": {"type": "string", "minLength": 1}, "graph_version": {"type": "integer", "minimum": 1},
     "node_id": {"type": "string", "minLength": 1}, "unit_id": {"type": "string", "pattern": "^U-"}, "attempt": {"type": "integer", "minimum": 1}, "objective": {"type": "string", "minLength": 1},
     "input_artifacts": {"type": "array", "items": {"type": "object"}}, "instructions": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1}, "inspect_targets": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1},

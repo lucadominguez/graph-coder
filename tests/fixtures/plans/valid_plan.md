@@ -1,5 +1,5 @@
 ---
-artifact_contract: agent-planning-system/v1
+artifact_contract: graph-coder/v1
 artifact_readiness: implementation-ready
 plan_id: P-demo
 plan_version: 1

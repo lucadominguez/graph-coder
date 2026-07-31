@@ -35,7 +35,7 @@ def test_parse_markdown_yaml_frontmatter_requires_contract_readiness_metadata_an
     None
 ):
     plan = parse_markdown_plan(fixture_text())
-    assert plan.metadata["artifact_contract"] == "agent-planning-system/v1"
+    assert plan.metadata["artifact_contract"] == "graph-coder/v1"
     assert plan.metadata["artifact_readiness"] == "implementation-ready"
     assert plan.metadata["plan_id"] == "P-demo"
     assert plan.plan_id == "P-demo"
@@ -114,7 +114,7 @@ def test_invalid_plan_fixture_is_rejected() -> None:
 @pytest.mark.parametrize(
     ("bad_text", "message"),
     [
-        (fixture_text().replace("agent-planning-system/v1", "wrong/v1"), "artifact_contract"),
+        (fixture_text().replace("graph-coder/v1", "wrong/v1"), "artifact_contract"),
         (
             fixture_text().replace(
                 "artifact_readiness: implementation-ready", "artifact_readiness: draft"

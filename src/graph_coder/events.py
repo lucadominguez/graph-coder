@@ -15,7 +15,7 @@ from .config import atomic_write
 from .db import transaction
 from .redaction import redact
 
-CONTRACT_VERSION = "agent-planning-system/v1"
+CONTRACT_VERSION = "graph-coder/v1"
 GENESIS_HASH = "0" * 64
 
 

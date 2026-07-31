@@ -4,7 +4,7 @@
   "type": "object", "additionalProperties": false,
   "required": ["artifact_contract", "artifact_type", "id", "version", "defect_id", "severity", "evidence", "affected_ids", "affected_section", "consequence", "proposed_resolution", "reviewer_identity", "model_receipt", "status"],
   "properties": {
-    "artifact_contract": {"const": "agent-planning-system/v1"}, "artifact_type": {"const": "review_defect"}, "id": {"type": "string", "minLength": 1}, "version": {"type": "integer", "minimum": 1},
+    "artifact_contract": {"const": "graph-coder/v1"}, "artifact_type": {"const": "review_defect"}, "id": {"type": "string", "minLength": 1}, "version": {"type": "integer", "minimum": 1},
     "defect_id": {"type": "string", "minLength": 1}, "severity": {"enum": ["P0", "P1", "P2", "P3"]}, "evidence": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1}, "affected_ids": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1}, "affected_section": {"type": "string", "minLength": 1}, "consequence": {"type": "string", "minLength": 1}, "proposed_resolution": {"type": "string", "minLength": 1}, "decision_needed": {"type": ["string", "null"]}, "reviewer_identity": {"type": "string", "minLength": 1}, "model_receipt": {"type": "string", "minLength": 1}, "status": {"enum": ["open", "resolved", "rejected-with-evidence"]}
   }
 }

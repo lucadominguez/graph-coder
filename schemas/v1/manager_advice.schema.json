@@ -4,7 +4,7 @@
   "type": "object", "additionalProperties": false,
   "required": ["artifact_contract", "artifact_type", "id", "version", "node_id", "problem", "evidence", "likely_cause", "allowed_recovery_options", "recommended_option", "tradeoff", "worker_actions", "escalation_threshold"],
   "properties": {
-    "artifact_contract": {"const": "agent-planning-system/v1"}, "artifact_type": {"const": "manager_advice"}, "id": {"type": "string", "minLength": 1}, "version": {"type": "integer", "minimum": 1},
+    "artifact_contract": {"const": "graph-coder/v1"}, "artifact_type": {"const": "manager_advice"}, "id": {"type": "string", "minLength": 1}, "version": {"type": "integer", "minimum": 1},
     "node_id": {"type": "string", "minLength": 1}, "problem": {"type": "string", "minLength": 1}, "evidence": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1}, "likely_cause": {"type": "string", "minLength": 1}, "allowed_recovery_options": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1}, "recommended_option": {"type": "string", "minLength": 1}, "tradeoff": {"type": "string", "minLength": 1}, "worker_actions": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1}, "proposed_plan_or_graph_change": {"type": ["object", "null"]}, "escalation_threshold": {"type": "string", "minLength": 1}
   }
 }

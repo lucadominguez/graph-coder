@@ -56,9 +56,14 @@ APS artifacts stay readable. They declare `agent-planning-system/v1`, and
 byte-for-byte copies of the APS v1 schemas live under `schemas/import/aps-v1/` so
 an old artifact can still be validated against the contract it was written for.
 
-Nothing in Graph Coder writes that contract identifier. If you need to inspect an
-old plan, validate it against the frozen schemas; do not feed it to the native
-readers and hope.
+Graph Coder writes `graph-coder/v1` and reads only `graph-coder/v1`. The two
+identifiers never mix: an APS artifact fed to a native reader is rejected on its
+`artifact_contract`, which is the intended outcome, because the unit contract
+underneath it lacks `manager_id`, `review_contract`, `context_manifest`,
+`retry_policy`, and `failure_domain`. If you need to inspect an old plan,
+validate it against the frozen schemas. To bring one forward, follow the
+by-hand path above; the contract identifier is the last field you change, once
+the content it promises is actually there.
 
 ## Upstream drift
 

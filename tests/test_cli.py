@@ -176,3 +176,91 @@ def test_cli_persists_plan_graph_route_and_emits_jcode_bundle(tmp_path, capsys) 
         for operation in operations
     )
     assert any(operation["action"] == "run_plan" for operation in operations)
+
+
+def test_malformed_route_input_is_a_refusal_not_a_traceback(tmp_path, capsys) -> None:
+    # A hand-authored payload is the normal way to call `route assign`, so the
+    # two mistakes it invites -- a missing key and an unexpected field -- must
+    # come back as JSON with exit 2, like every other failure.
+    assert main(["--root", str(tmp_path), "init"]) == 0
+    capsys.readouterr()
+
+    missing_task = tmp_path / "missing-task.json"
+    missing_task.write_text(json.dumps({"plan_id": "P-demo"}), encoding="utf-8")
+    assert main(["--root", str(tmp_path), "route", "assign", "--input", str(missing_task)]) == 2
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["ok"] is False
+    assert payload["error"] == "KeyError"
+    assert "missing required field" in payload["message"]
+
+    unknown_field = tmp_path / "unknown-field.json"
+    unknown_field.write_text(
+        json.dumps({"task": {"task_id": "IU-demo", "role": "worker", "risk": "medium"}}),
+        encoding="utf-8",
+    )
+    assert main(["--root", str(tmp_path), "route", "assign", "--input", str(unknown_field)]) == 2
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["ok"] is False
+    assert payload["error"] == "TypeError"
+    assert "risk" in payload["message"]
+
+
+def test_shipped_example_plan_validates_and_compiles(tmp_path, capsys) -> None:
+    # The README quickstart runs these exact commands against these exact files.
+    # It shipped once pointing at a plan that did not exist, so the example is a
+    # test fixture now, not just documentation.
+    repository_root = Path(__file__).resolve().parent.parent
+    plan_path = repository_root / "docs" / "plans" / "example-plan.md"
+    route_request = repository_root / "docs" / "plans" / "example-route-request.json"
+    assert plan_path.exists(), "the README quickstart points at this plan"
+    assert route_request.exists(), "the README routing example points at this request"
+
+    assert main(["--root", str(tmp_path), "init"]) == 0
+    capsys.readouterr()
+    assert main(["--root", str(tmp_path), "plan", "validate", "--file", str(plan_path)]) == 0
+    assert json.loads(capsys.readouterr().out)["defects"] == []
+    assert main(["--root", str(tmp_path), "plan", "snapshot", "--file", str(plan_path)]) == 0
+    capsys.readouterr()
+
+    graph_path = tmp_path / "graph.json"
+    assert (
+        main(
+            [
+                "--root",
+                str(tmp_path),
+                "graph",
+                "compile",
+                "--plan",
+                str(plan_path),
+                "--output",
+                str(graph_path),
+            ]
+        )
+        == 0
+    )
+    capsys.readouterr()
+    assert main(["--root", str(tmp_path), "graph", "validate", "--file", str(graph_path)]) == 0
+    capsys.readouterr()
+
+    graph = json.loads(graph_path.read_text(encoding="utf-8"))
+    nodes = {node["id"]: node for node in graph["nodes"]}
+    assert set(nodes) == {
+        "Director",
+        "M-API",
+        "M-STORAGE",
+        "IU-MIGRATION",
+        "IU-STORE",
+        "IU-SCHEMA",
+        "IU-ENDPOINT",
+    }
+    for manager_id in ("M-API", "M-STORAGE"):
+        assert nodes[manager_id]["kind"] == "manage"
+        assert nodes[manager_id]["authority"] == "advisory_only"
+        assert nodes[manager_id]["write_scopes"] == []
+    assert nodes["IU-ENDPOINT"]["review_owner"] == "M-API"
+    assert nodes["IU-STORE"]["review_owner"] == "M-STORAGE"
+
+    # The routing example must name capabilities the registry can actually
+    # produce, or it refuses on evidence rather than demonstrating a route.
+    request = json.loads(route_request.read_text(encoding="utf-8"))
+    assert set(request["task"]["required_tools"]) <= {"edit", "bash", "read"}

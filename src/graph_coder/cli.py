@@ -1108,8 +1108,23 @@ def main(argv: Sequence[str] | None = None) -> int:
         result = args.handler(args)
         _emit(result, pretty=not args.compact)
         return 0 if result.get("ok", True) else 2
-    except (GraphCoderError, ValueError, OSError, sqlite3.Error, json.JSONDecodeError) as exc:
-        _emit({"ok": False, "error": type(exc).__name__, "message": str(exc)}, pretty=True)
+    except (
+        GraphCoderError,
+        ValueError,
+        OSError,
+        sqlite3.Error,
+        json.JSONDecodeError,
+        # A hand-authored --input payload is the normal way to call `route
+        # assign`, so a missing key or an unexpected field is user error, not a
+        # crash. Without these, argument shapes escape as tracebacks and exit 1,
+        # breaking the contract that every failure is JSON with exit 2.
+        KeyError,
+        TypeError,
+    ) as exc:
+        message = str(exc)
+        if isinstance(exc, KeyError):
+            message = f"missing required field {message}"
+        _emit({"ok": False, "error": type(exc).__name__, "message": message}, pretty=True)
         return 2
 
 

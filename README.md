@@ -104,16 +104,43 @@ environment at request time and never persisted. See `docs/installation.md`.
 There are no `new`, `approve`, `execute`, or `status` top-level commands.
 Approval and lifecycle transitions are recorded with `event append`.
 
+`docs/plans/example-plan.md` is a complete worked plan: four units, two advisory
+managers, one dependency chain, no overlapping write scopes. These commands run
+against it as written, from a clean checkout, with no network and no API key.
+
 ```shell
 graph-coder --root . init
 graph-coder --root . plan validate   --file docs/plans/example-plan.md
 graph-coder --root . plan snapshot   --file docs/plans/example-plan.md
 graph-coder --root . graph compile   --plan docs/plans/example-plan.md --output .graph-coder/artifacts/graph.json
-graph-coder --root . route assign    --input .graph-coder/artifacts/routes.json
+graph-coder --root . graph validate  --file .graph-coder/artifacts/graph.json
 graph-coder --root . event append    --type plan.approved --payload "{}" --role Director --plan-id P-example
 graph-coder --root . jcode emit      --graph .graph-coder/artifacts/graph.json
 graph-coder --root . run status
 ```
+
+`graph compile` turns those four units into seven nodes: a Director, `M-API` and
+`M-STORAGE` as advisory managers holding no write scope, and the four workers,
+each with its `review_owner` set to the manager that must pass it.
+
+Routing is separate because it needs evidence. Nothing in the pipeline above
+produces a routing request; you write one, and `docs/plans/example-route-request.json`
+is a working example for the `IU-ENDPOINT` unit.
+
+```shell
+export LLM_STATS_API_KEY=...   # PowerShell: $env:LLM_STATS_API_KEY = "..."
+graph-coder --root . route refresh
+graph-coder --root . route assign --input docs/plans/example-route-request.json --from-cache
+```
+
+`route refresh` is not optional. `--from-cache` refuses to route on evidence that
+is missing, stale, or older than `--max-age-hours`, and the error names `route
+refresh` as the fix. Two fields in the request repay attention: `required_tools`
+accepts `edit`, `bash`, and `read`, because that is the whole vocabulary the
+registry derives from the API's `supports_tools` flag; and `benchmark_weights`
+keys are LLM Stats categories such as `code`, `tool_calling`, and
+`frontend_development`. A weight naming a category the data does not carry scores
+zero rather than erroring, which silently drags a model's quality down.
 
 ## What the code enforces
 

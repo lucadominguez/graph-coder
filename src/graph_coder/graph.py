@@ -13,7 +13,7 @@ from typing import Any, Literal, Self
 
 from graph_coder.errors import ContractError
 
-SCHEMA_VERSION = "agent-planning-system/v1"
+SCHEMA_VERSION = "graph-coder/v1"
 
 
 class NodeKind(StrEnum):
