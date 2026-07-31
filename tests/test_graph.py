@@ -35,9 +35,7 @@ def test_json_roundtrip_preserves_v1_fields() -> None:
         # holding a write scope.
         managing = kind == "manage"
         role = (
-            NodeRole.COMPOSITE
-            if managing or kind in {"explore", "integrate"}
-            else NodeRole.ATOMIC
+            NodeRole.COMPOSITE if managing or kind in {"explore", "integrate"} else NodeRole.ATOMIC
         )
         deps = ["Director"] if index == 0 else [f"n{index - 1}"]
         nodes.append(

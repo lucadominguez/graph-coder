@@ -63,9 +63,7 @@ def test_approved_plans_must_bind_four_hashes_and_a_full_render() -> None:
         with pytest.raises(ContractValidationError, match="missing required hashes"):
             parse_markdown_plan(broken)
 
-    summary_only = fixture_text().replace(
-        "rendered_full_plan: true", "rendered_full_plan: false"
-    )
+    summary_only = fixture_text().replace("rendered_full_plan: true", "rendered_full_plan: false")
     with pytest.raises(ContractValidationError, match="summary is not an approval view"):
         parse_markdown_plan(summary_only)
 

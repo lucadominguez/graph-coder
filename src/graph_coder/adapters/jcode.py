@@ -144,17 +144,13 @@ class JCodeAdapter:
                             "authority": str(manager.authority),
                             "write_scopes": list(manager.write_scopes),
                             "reviews": [
-                                node.id
-                                for node in graph.nodes
-                                if node.review_owner == manager.id
+                                node.id for node in graph.nodes if node.review_owner == manager.id
                             ],
                         }
                         for manager in managers
                     ],
                     "review_assignments": {
-                        node.id: node.review_owner
-                        for node in dispatch_nodes
-                        if node.review_owner
+                        node.id: node.review_owner for node in dispatch_nodes if node.review_owner
                     },
                 },
             },

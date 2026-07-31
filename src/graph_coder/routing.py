@@ -19,9 +19,7 @@ from .errors import RoutingError
 
 RouteRole = Literal["director", "manager", "worker", "research", "rehearsal"]
 
-ROUTE_ROLES: frozenset[str] = frozenset(
-    {"director", "manager", "worker", "research", "rehearsal"}
-)
+ROUTE_ROLES: frozenset[str] = frozenset({"director", "manager", "worker", "research", "rehearsal"})
 
 NORMALIZATION_VERSION = "graph-coder/routing/v1"
 
@@ -66,14 +64,19 @@ class TaskRequirements:
     force_override: bool = False
 
     def __post_init__(self) -> None:
-        if self.role not in ROUTE_ROLES:
-            if self.role == "reviewer":
+        # Widened deliberately. RouteRole is a Literal, but this object is built
+        # from JSON payloads, so at runtime `role` is whatever the caller wrote.
+        # Comparing the declared type against "reviewer" reads as unreachable to
+        # a type checker; the check exists precisely because it is not.
+        role: str = self.role
+        if role not in ROUTE_ROLES:
+            if role == "reviewer":
                 raise RoutingError(
                     "there is no standalone reviewer route category: a worker's review "
                     "runs on its manager's route"
                 )
             raise RoutingError(
-                f"unknown route role {self.role!r}; expected one of {sorted(ROUTE_ROLES)}"
+                f"unknown route role {role!r}; expected one of {sorted(ROUTE_ROLES)}"
             )
 
 
@@ -474,15 +477,12 @@ def _apply_subscription_first(
                         "model_id": score.model.model_id,
                         "provider_id": score.provider.provider_id,
                         "reasons": [
-                            "subscription-first: duplicates the eligible route "
-                            f"{duplicate_of}"
+                            f"subscription-first: duplicates the eligible route {duplicate_of}"
                         ],
                     }
                 )
         eliminated_ids = {item["model_id"] for item in eliminations}
-        reseller = [
-            score for score in reseller if score.model.model_id not in eliminated_ids
-        ]
+        reseller = [score for score in reseller if score.model.model_id not in eliminated_ids]
 
     for group_name, group in (
         ("direct_subscription", direct),
@@ -542,11 +542,7 @@ def _duplicate_of(
     """
 
     def keys(score: CandidateScore) -> set[str]:
-        return {
-            key
-            for key in (score.model.model_id, score.model.equivalence_class)
-            if key
-        }
+        return {key for key in (score.model.model_id, score.model.equivalence_class) if key}
 
     reseller_keys = keys(reseller)
     if task.equivalence_class and task.equivalence_class in reseller_keys:
@@ -641,9 +637,7 @@ def build_route_receipt(
         "reseller_exception_required": bool(
             decision.explanation.get("reseller_exception_required", False)
         ),
-        "subscription_precedence_group": decision.explanation.get(
-            "subscription_precedence_group"
-        ),
+        "subscription_precedence_group": decision.explanation.get("subscription_precedence_group"),
         "open_weight_preference_effect": (
             "applied"
             if decision.explanation.get("open_weight_preference_applied")
@@ -747,9 +741,7 @@ def _score_candidate(
     # zero so an unconfigured registry never implies precision it does not have.
     probability_of_repair = _bounded(1.0 - pass_probability)
     repair_cost = model.per_attempt_cost * max(0.0, task.repair_cost_factor)
-    probability_of_escalation = _bounded(
-        (1.0 - pass_probability) ** max(1, task.max_attempts)
-    )
+    probability_of_escalation = _bounded((1.0 - pass_probability) ** max(1, task.max_attempts))
     escalation_cost = max(0.0, task.escalation_cost)
     expected_cost = (
         attempt_cost
@@ -803,9 +795,7 @@ def _benchmark_coverage(task: TaskRequirements, model: ModelCapabilities) -> flo
     total_weight = sum(max(0.0, weight) for weight in weights.values())
     if total_weight <= 0:
         return 0.0
-    covered = sum(
-        max(0.0, weight) for name, weight in weights.items() if name in model.benchmarks
-    )
+    covered = sum(max(0.0, weight) for name, weight in weights.items() if name in model.benchmarks)
     return _bounded(covered / total_weight)
 
 

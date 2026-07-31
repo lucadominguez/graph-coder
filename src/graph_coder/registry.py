@@ -306,9 +306,7 @@ def build_registry(
                     provider_id=provider_id,
                     authenticated=True,
                     reliability=1.0,
-                    provider_class=(
-                        "direct_oauth" if zero_marginal else provider_class
-                    ),
+                    provider_class=("direct_oauth" if zero_marginal else provider_class),
                 ),
             )
             models.append(

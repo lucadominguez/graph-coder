@@ -152,9 +152,7 @@ def validate_transition(
     source = coerce_state(current)
     destination = coerce_state(target)
     if destination not in ALLOWED_TRANSITIONS[source]:
-        raise ContractError(
-            f"node {node_id}: {source} cannot transition to {destination}"
-        )
+        raise ContractError(f"node {node_id}: {source} cannot transition to {destination}")
     return destination
 
 
@@ -256,9 +254,7 @@ class Frontier:
         }
 
 
-def compute_frontier(
-    graph: ExecutionGraph, states: dict[str, str | ExecutionState]
-) -> Frontier:
+def compute_frontier(graph: ExecutionGraph, states: dict[str, str | ExecutionState]) -> Frontier:
     """Derive the ready frontier from durable node states.
 
     A node is ready only when every dependency reached `completed`, which only a
@@ -269,8 +265,7 @@ def compute_frontier(
 
     nodes = graph.by_id()
     resolved = {
-        node_id: coerce_state(states.get(node_id, ExecutionState.PENDING))
-        for node_id in nodes
+        node_id: coerce_state(states.get(node_id, ExecutionState.PENDING)) for node_id in nodes
     }
 
     isolated: set[str] = set()

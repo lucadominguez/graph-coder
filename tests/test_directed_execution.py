@@ -23,29 +23,73 @@ from graph_coder.recovery import human_required_nodes, ready_frontier, resume_hu
 def graph() -> ExecutionGraph:
     """Director, two managers, and two independent branches.
 
-        Director
-        ├── manager-a  ->  a1 -> a2
-        └── manager-b  ->  b1 -> b2
+    Director
+    ├── manager-a  ->  a1 -> a2
+    └── manager-b  ->  b1 -> b2
     """
 
     return ExecutionGraph(
         nodes=[
-            GraphNode(id="Director", kind="explore", role="composite", authority="advisory_only",
-                      title="Director", children=["manager-a", "manager-b"]),
-            GraphNode(id="manager-a", kind="manage", role="composite", authority="advisory_only",
-                      title="Manager A", depends_on=["Director"], review_owner="Director",
-                      children=["a1", "a2"]),
-            GraphNode(id="manager-b", kind="manage", role="composite", authority="advisory_only",
-                      title="Manager B", depends_on=["Director"], review_owner="Director",
-                      children=["b1", "b2"]),
-            GraphNode(id="a1", kind="implement", title="A1", depends_on=["manager-a"],
-                      write_scopes=["src/a1.py"], review_owner="manager-a"),
-            GraphNode(id="a2", kind="implement", title="A2", depends_on=["a1"],
-                      write_scopes=["src/a2.py"], review_owner="manager-a"),
-            GraphNode(id="b1", kind="implement", title="B1", depends_on=["manager-b"],
-                      write_scopes=["src/b1.py"], review_owner="manager-b"),
-            GraphNode(id="b2", kind="implement", title="B2", depends_on=["b1"],
-                      write_scopes=["src/b2.py"], review_owner="manager-b"),
+            GraphNode(
+                id="Director",
+                kind="explore",
+                role="composite",
+                authority="advisory_only",
+                title="Director",
+                children=["manager-a", "manager-b"],
+            ),
+            GraphNode(
+                id="manager-a",
+                kind="manage",
+                role="composite",
+                authority="advisory_only",
+                title="Manager A",
+                depends_on=["Director"],
+                review_owner="Director",
+                children=["a1", "a2"],
+            ),
+            GraphNode(
+                id="manager-b",
+                kind="manage",
+                role="composite",
+                authority="advisory_only",
+                title="Manager B",
+                depends_on=["Director"],
+                review_owner="Director",
+                children=["b1", "b2"],
+            ),
+            GraphNode(
+                id="a1",
+                kind="implement",
+                title="A1",
+                depends_on=["manager-a"],
+                write_scopes=["src/a1.py"],
+                review_owner="manager-a",
+            ),
+            GraphNode(
+                id="a2",
+                kind="implement",
+                title="A2",
+                depends_on=["a1"],
+                write_scopes=["src/a2.py"],
+                review_owner="manager-a",
+            ),
+            GraphNode(
+                id="b1",
+                kind="implement",
+                title="B1",
+                depends_on=["manager-b"],
+                write_scopes=["src/b1.py"],
+                review_owner="manager-b",
+            ),
+            GraphNode(
+                id="b2",
+                kind="implement",
+                title="B2",
+                depends_on=["b1"],
+                write_scopes=["src/b2.py"],
+                review_owner="manager-b",
+            ),
         ]
     )
 
@@ -94,9 +138,7 @@ def test_repair_required_needs_a_defect_and_an_instruction() -> None:
     with pytest.raises(ContractError, match="bounded defect"):
         apply_manager_review(ExecutionState.AWAITING_REVIEW, "repair_required")
     with pytest.raises(ContractError, match="repair instruction"):
-        apply_manager_review(
-            ExecutionState.AWAITING_REVIEW, "repair_required", defects=["broken"]
-        )
+        apply_manager_review(ExecutionState.AWAITING_REVIEW, "repair_required", defects=["broken"])
 
 
 def test_human_required_needs_the_question_and_the_attempts() -> None:
@@ -128,9 +170,7 @@ def test_unknown_verdicts_and_states_are_rejected() -> None:
 
 
 def test_a_human_decision_reopens_the_branch() -> None:
-    assert (
-        validate_transition(ExecutionState.HUMAN_REQUIRED, "ready") is ExecutionState.READY
-    )
+    assert validate_transition(ExecutionState.HUMAN_REQUIRED, "ready") is ExecutionState.READY
 
 
 # --- failure isolation -------------------------------------------------------
@@ -176,9 +216,7 @@ def test_a_human_required_branch_blocks_only_its_descendants() -> None:
 
 
 def test_independent_work_continues_after_an_isolated_failure() -> None:
-    frontier = compute_frontier(
-        graph(), states(a1="human_required", b1="completed")
-    )
+    frontier = compute_frontier(graph(), states(a1="human_required", b1="completed"))
     assert "b2" in frontier.ready
     assert set(frontier.ready) & {"a1", "a2"} == set()
 
@@ -189,9 +227,7 @@ def test_repair_required_nodes_are_ready_for_a_worker_again() -> None:
 
 
 def test_running_and_completed_nodes_are_not_redispatched() -> None:
-    frontier = compute_frontier(
-        graph(), states(a1="completed", a2="running", b1="cancelled")
-    )
+    frontier = compute_frontier(graph(), states(a1="completed", a2="running", b1="cancelled"))
     assert "a1" not in frontier.ready
     assert "a2" not in frontier.ready
     assert "b1" not in frontier.ready

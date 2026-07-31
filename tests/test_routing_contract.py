@@ -168,9 +168,7 @@ def test_expected_passing_cost_includes_repair_and_escalation_terms() -> None:
     candidate = model("m", "openai", cost=1.0, quality=0.5)
     providers = [ProviderCapabilities(provider_id="openai", authenticated=True, reliability=1.0)]
 
-    without = route_model(
-        TaskRequirements(task_id="IU-1", max_attempts=1), [candidate], providers
-    )
+    without = route_model(TaskRequirements(task_id="IU-1", max_attempts=1), [candidate], providers)
     with_terms = route_model(
         TaskRequirements(
             task_id="IU-1",
@@ -271,8 +269,7 @@ def test_subscription_first_cases_are_enforced_by_the_router(case: dict) -> None
     assert decision.selected is not None, case["name"]
     assert decision.selected.model.model_id == case["expected"], case["name"]
     assert (
-        decision.explanation["reseller_exception_required"]
-        is case["reseller_exception_required"]
+        decision.explanation["reseller_exception_required"] is case["reseller_exception_required"]
     ), case["name"]
 
 

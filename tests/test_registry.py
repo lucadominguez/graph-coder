@@ -105,9 +105,7 @@ def test_models_without_providers_or_inference_are_excluded_and_counted() -> Non
     assert build.report["models_skipped_inference_unavailable"] >= 1
     ids = {model.equivalence_class for model in build.models}
     unavailable = [
-        record["id"]
-        for record in records()
-        if not (record.get("inference") or {}).get("available")
+        record["id"] for record in records() if not (record.get("inference") or {}).get("available")
     ]
     for model_id in unavailable:
         assert model_id not in ids

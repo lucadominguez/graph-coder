@@ -1061,15 +1061,11 @@ def build_parser() -> argparse.ArgumentParser:
     run_recover = run.add_parser("recover")
     run_recover.add_argument("--role", default="Director")
     _set_handler(run_recover, _cmd_run_recover)
-    run_resume = run.add_parser(
-        "resume", help="record a human decision on a human_required branch"
-    )
+    run_resume = run.add_parser("resume", help="record a human decision on a human_required branch")
     run_resume.add_argument("--node-id", required=True)
     run_resume.add_argument("--decision", required=True, help="what the human decided, and why")
     run_resume.add_argument("--decided-by", default="user")
-    run_resume.add_argument(
-        "--status", default="ready", choices=("ready", "cancelled", "failed")
-    )
+    run_resume.add_argument("--status", default="ready", choices=("ready", "cancelled", "failed"))
     _set_handler(run_resume, _cmd_run_resume)
 
     context = commands.add_parser("context", help="role-specific context packets").add_subparsers(

@@ -120,9 +120,7 @@ def test_every_active_skill_exists_with_valid_frontmatter():
 
 def test_skill_descriptions_state_when_to_invoke_not_the_whole_workflow():
     for name, text in all_active_skill_text().items():
-        description = next(
-            line for line in text.splitlines() if line.startswith("description:")
-        )
+        description = next(line for line in text.splitlines() if line.startswith("description:"))
         assert len(description) < 400, f"{name} description is a workflow summary"
 
 
@@ -246,9 +244,7 @@ def test_verify_nodes_cannot_smuggle_a_reviewer_role_back_in():
 
 def test_manager_does_not_receive_worker_private_reasoning():
     assert "does not receive the worker's private reasoning" in orchestrator()
-    assert "You do not receive the worker's private reasoning" in read(
-        "execution-manager/SKILL.md"
-    )
+    assert "You do not receive the worker's private reasoning" in read("execution-manager/SKILL.md")
 
 
 # --- failure isolation -------------------------------------------------------

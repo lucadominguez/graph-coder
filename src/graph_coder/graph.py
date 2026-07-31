@@ -295,9 +295,7 @@ class ExecutionGraph:
                         "managers advise and review, they do not implement"
                     )
             elif node.authority == NodeAuthority.ADVISORY_ONLY and node.write_scopes:
-                raise ContractError(
-                    f"advisory_only node {node.id} must have an empty write scope"
-                )
+                raise ContractError(f"advisory_only node {node.id} must have an empty write scope")
 
             if node.review_owner is None:
                 continue

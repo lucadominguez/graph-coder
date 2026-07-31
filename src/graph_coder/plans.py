@@ -318,8 +318,7 @@ def _require_metadata(metadata: dict[str, Any]) -> None:
         approval = metadata.get("approval")
         if not isinstance(approval, dict):
             raise ContractValidationError(
-                "an approved plan must record an approval bound to "
-                + ", ".join(APPROVAL_HASHES)
+                "an approved plan must record an approval bound to " + ", ".join(APPROVAL_HASHES)
             )
         missing = [name for name in APPROVAL_HASHES if not approval.get(name)]
         if missing:

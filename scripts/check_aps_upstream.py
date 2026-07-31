@@ -164,9 +164,7 @@ def _inspect(lock: UpstreamLock, workdir: Path) -> UpstreamReport:
     head = _git(workdir, "rev-parse", "--verify", "--quiet", branch_ref, check=False)
     remote_commit = head.stdout.strip()
     if not remote_commit:
-        raise UpstreamCheckError(
-            f"{lock.repository_url} has no branch {lock.branch!r}"
-        )
+        raise UpstreamCheckError(f"{lock.repository_url} has no branch {lock.branch!r}")
 
     known = _git(workdir, "cat-file", "-e", f"{lock.commit}^{{commit}}", check=False)
     if known.returncode != 0:
@@ -189,12 +187,18 @@ def _inspect(lock: UpstreamLock, workdir: Path) -> UpstreamReport:
             branch=lock.branch,
         )
 
-    pinned_precedes = _git(
-        workdir, "merge-base", "--is-ancestor", lock.commit, remote_commit, check=False
-    ).returncode == 0
-    remote_precedes = _git(
-        workdir, "merge-base", "--is-ancestor", remote_commit, lock.commit, check=False
-    ).returncode == 0
+    pinned_precedes = (
+        _git(
+            workdir, "merge-base", "--is-ancestor", lock.commit, remote_commit, check=False
+        ).returncode
+        == 0
+    )
+    remote_precedes = (
+        _git(
+            workdir, "merge-base", "--is-ancestor", remote_commit, lock.commit, check=False
+        ).returncode
+        == 0
+    )
 
     if pinned_precedes:
         status = "behind"
@@ -228,9 +232,7 @@ def _inspect(lock: UpstreamLock, workdir: Path) -> UpstreamReport:
         branch=lock.branch,
         commits=commits,
         changed_paths=changed,
-        relevant_changed_paths=[
-            path for path in changed if path.startswith(RELEVANT_PREFIXES)
-        ],
+        relevant_changed_paths=[path for path in changed if path.startswith(RELEVANT_PREFIXES)],
     )
 
 
