@@ -252,7 +252,12 @@ A unit's `retry_policy` may shorten the ladder. Nothing may make it unbounded.
         │  one route per (model, provider) pair
         │  organization == provider -> direct_oauth
         │  openrouter/together/... -> reseller
-        │  top_scores{}     -> benchmarks vector
+        │  top_scores{}     -> benchmarks vector, MIN-MAX NORMALIZED
+        │                       per category against the routable field,
+        │                       because categories arrive on different
+        │                       scales (code 0..1, finance ~900). Bounds
+        │                       recorded; <2 models -> neutral 0.5;
+        │                       >50x internal spread -> mixed-unit warning
         │  input/output_price_per_m + assumed tokens -> per_attempt_cost
         │  context_window is null for ALL models -> counted + warned,
         │                                            never invented

@@ -138,9 +138,11 @@ is missing, stale, or older than `--max-age-hours`, and the error names `route
 refresh` as the fix. Two fields in the request repay attention: `required_tools`
 accepts `edit`, `bash`, and `read`, because that is the whole vocabulary the
 registry derives from the API's `supports_tools` flag; and `benchmark_weights`
-keys are LLM Stats categories such as `code`, `tool_calling`, and
-`frontend_development`. A weight naming a category the data does not carry scores
-zero rather than erroring, which silently drags a model's quality down.
+keys are LLM Stats categories such as `code`, `tool_calling`, and `reasoning`.
+Any category is safe to weight, because the registry normalizes each one against
+the field before scoring. A weight naming a category the data does not carry
+still scores zero rather than erroring, so check `benchmark_coverage` in the
+receipt.
 
 ## What the code enforces
 

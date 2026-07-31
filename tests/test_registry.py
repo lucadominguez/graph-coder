@@ -18,7 +18,9 @@ import pytest
 from graph_coder.errors import RoutingError
 from graph_coder.llm_stats import DEFAULT_API_BASE, LLMStatsClient
 from graph_coder.registry import (
+    NEUTRAL_BENCHMARK_SCORE,
     assert_fresh,
+    benchmark_scales,
     build_registry,
     per_attempt_cost,
 )
@@ -234,3 +236,78 @@ def test_missing_timestamp_is_refused_rather_than_assumed_fresh() -> None:
 def test_the_refusal_names_the_fix() -> None:
     with pytest.raises(RoutingError, match="route refresh"):
         assert_fresh(now_minus(99), max_age_hours=1.0, source="cache", stale=False)
+
+
+# --- benchmark normalization -------------------------------------------------
+
+
+def test_top_scores_are_not_on_a_common_scale() -> None:
+    # The premise of everything below. If the API ever normalizes its own scores
+    # this test fails and the normalization can be reconsidered.
+    scales = benchmark_scales(records())
+    assert scales["code"].maximum <= 1.0
+    assert scales["finance"].maximum > 100.0
+
+
+def test_raw_scale_no_longer_decides_the_route() -> None:
+    # Before normalization, a weighted mean of raw values bounded to 0..1 pinned
+    # every model weighted on a large-scale category to exactly 1.0, so quality
+    # stopped discriminating and the tie-breakers picked the cheapest model while
+    # reporting a perfect score.
+    build = build_registry(records())
+    by_model = {model.model_id: model for model in build.models}
+    for model in by_model.values():
+        for score in model.benchmarks.values():
+            assert 0.0 <= score <= 1.0
+
+    large_scale = [
+        model.benchmarks["reasoning"]
+        for model in by_model.values()
+        if "reasoning" in model.benchmarks
+    ]
+    assert len(set(large_scale)) > 1, "a large-scale category must still rank models"
+    assert min(large_scale) < 1.0, "not every model may saturate at the top score"
+
+
+def test_normalization_is_measured_against_the_routable_field() -> None:
+    payload = records()
+    scales = benchmark_scales(payload)
+    # A model the router may never choose must not set the bounds others are
+    # ranked against.
+    unavailable = [dict(record) for record in payload]
+    unavailable[0]["inference"] = {**(unavailable[0].get("inference") or {}), "available": False}
+    unavailable[0]["top_scores"] = {"code": 99999.0}
+    assert benchmark_scales(unavailable)["code"].maximum == scales["code"].maximum
+
+
+def test_a_category_that_cannot_rank_scores_neutral_not_zero() -> None:
+    payload = [dict(record) for record in records()]
+    for record in payload:
+        record["top_scores"] = {"solo": 0.42}
+    build = build_registry(payload)
+    for model in build.models:
+        assert model.benchmarks["solo"] == NEUTRAL_BENCHMARK_SCORE
+    assert "benchmark_warning" in build.report
+
+
+def test_mixed_units_inside_one_category_are_reported() -> None:
+    build = build_registry(records())
+    scales = build.report["benchmark_scales"]
+    assert scales["reasoning"]["suspect_mixed_units"] is True
+    assert scales["code"]["suspect_mixed_units"] is False
+    assert "benchmark_mixed_unit_warning" in build.report
+
+
+def test_receipt_separates_missing_evidence_from_poor_evidence() -> None:
+    build = build_registry(records())
+    task = TaskRequirements(
+        task_id="IU-demo",
+        role="worker",
+        benchmark_weights={"code": 0.5, "not_a_category": 0.5},
+        quality_floor=0.0,
+    )
+    decision = route_model(task, build.models, build.providers, [])
+    assert decision.selected is not None
+    explanation = decision.selected.explanation
+    assert explanation["benchmark_coverage"] == 0.5
+    assert explanation["unscored_benchmark_weights"] == ["not_a_category"]

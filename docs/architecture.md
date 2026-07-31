@@ -133,6 +133,7 @@ route, and the receipt explains why.
 hard filters (auth, context, output, tools, modalities, streaming, class,
               policies, environment, cost ceiling, confidence, freshness,
               provider and model allow and deny rules)
+  -> external = weighted mean of per-category normalized benchmark scores
   -> quality = (0.60 * external + 0.30 * local) / 0.90
   -> quality floor
   -> subscription-first precedence
@@ -153,6 +154,38 @@ expected_passing_cost = attempt_cost
 
 The repair and escalation terms use configured estimates and default to zero, so
 an unconfigured registry never implies precision it does not have.
+
+### Benchmark normalization
+
+`top_scores` categories do not share a scale. On live data `code` and
+`tool_calling` arrive in 0..1 while `reasoning` sits near 150 and `finance` near
+900. The external score is a weighted mean bounded to 0..1, so raw values pinned
+every model weighted on a large-scale category to exactly 1.0. Quality stopped
+discriminating, the Pareto frontier collapsed, and the tie-breakers picked the
+cheapest candidate while the receipt reported a perfect score. Cheap is often
+right, but arriving there by accident is not routing.
+
+Scores are therefore min-max normalized per category, against the field the
+router may actually choose from, before they reach `route_model`. Normalization
+lives in `registry.py` so `route_model` stays a pure function over prepared
+inputs. Three properties keep it honest:
+
+- The bounds used are recorded per category in the build report, so a route is
+  reproducible and a human can see what a score was measured against.
+- A category fewer than two models report, or where every model scored the same,
+  ranks nothing and yields a neutral 0.5 rather than a 0.0 that would read as a
+  bad result.
+- A category whose own values span more than 50x is flagged as carrying mixed
+  units. `reasoning` spans 0.6 to 419.1 on real data, which no single benchmark
+  produces, so a low scorer there is likely measured on a different benchmark
+  rather than being hundreds of times worse.
+
+A weighted category a model does not report still contributes its full weight to
+the denominator and nothing to the numerator, so absent evidence scores like a
+poor result. That is the conservative reading and it is deliberate, but the
+receipt now carries `benchmark_coverage` and `unscored_benchmark_weights` so a
+candidate losing on missing benchmarks is distinguishable from one losing on bad
+ones.
 
 Role categories replace per-unit routing alone. The Director is pinned to its
 configured frontier model and receives no automatic fallback: a pinned route that

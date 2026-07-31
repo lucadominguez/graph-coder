@@ -17,6 +17,15 @@ Two honest limitations are surfaced rather than papered over:
    `input_price_per_m` and `output_price_per_m` per provider. Converting those to
    a per-attempt cost requires assuming how many tokens an attempt spends, so the
    assumption is an explicit, recorded input.
+
+3. **`top_scores` values are not on a common scale.** Categories carry whatever
+   unit their leading benchmark uses: `code` and `tool_calling` arrive in 0..1
+   while `reasoning` and `general` arrive near 150 and `finance` and `legal` near
+   900. The router scores a weighted mean and bounds it to 0..1, so feeding raw
+   values pinned every model weighted on a large-scale category to exactly 1.0,
+   which silently destroyed discrimination and handed the decision to the
+   tie-breakers. Values are normalized per category against the candidate field
+   before they reach the router, and the bounds used are recorded.
 """
 
 from __future__ import annotations
@@ -40,6 +49,110 @@ RESELLER_PROVIDER_IDS: frozenset[str] = frozenset(
 #: are recorded in the build report.
 DEFAULT_INPUT_TOKENS_PER_ATTEMPT = 40_000
 DEFAULT_OUTPUT_TOKENS_PER_ATTEMPT = 8_000
+
+
+#: Scores that cannot discriminate get this. It is deliberately the midpoint: a
+#: category only one model reports, or one where every model scored identically,
+#: is evidence of nothing, and both 0.0 and 1.0 would be claims the data does not
+#: support.
+NEUTRAL_BENCHMARK_SCORE = 0.5
+
+#: A category whose largest value exceeds its smallest by more than this factor is
+#: almost certainly carrying two different benchmarks under one name. Chosen well
+#: above the spread any single benchmark produces across models, and well below
+#: the ~700x seen in `reasoning` on live data.
+MIXED_UNIT_RATIO = 50.0
+
+
+@dataclass(frozen=True)
+class BenchmarkScale:
+    """The observed range of one `top_scores` category across the candidate field.
+
+    Recorded so a route is auditable and reproducible: the same records always
+    produce the same bounds, and a receipt can show what a normalized score was
+    measured against.
+    """
+
+    category: str
+    minimum: float
+    maximum: float
+    count: int
+
+    @property
+    def degenerate(self) -> bool:
+        """True when the category cannot rank anything."""
+
+        return self.count < 2 or self.maximum <= self.minimum
+
+    @property
+    def suspect_mixed_units(self) -> bool:
+        """True when one category's own values look like two different benchmarks.
+
+        `reasoning` arrived spanning 0.6 to 419.1 on real data. A single benchmark
+        does not produce that, so the low scorer is probably measured on a
+        different one rather than being 700 times worse. Normalizing still ranks
+        them, and ranking them is still wrong, so the spread is reported instead
+        of being quietly averaged away.
+        """
+
+        return (
+            not self.degenerate
+            and self.minimum > 0
+            and self.maximum / self.minimum > MIXED_UNIT_RATIO
+        )
+
+    def normalize(self, value: float) -> float:
+        if self.degenerate:
+            return NEUTRAL_BENCHMARK_SCORE
+        span = self.maximum - self.minimum
+        return min(1.0, max(0.0, (value - self.minimum) / span))
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "min": self.minimum,
+            "max": self.maximum,
+            "models": self.count,
+            "degenerate": self.degenerate,
+            "suspect_mixed_units": self.suspect_mixed_units,
+        }
+
+
+def _is_scoreable(value: Any) -> bool:
+    """A usable benchmark value: a real number, not a bool, not NaN or infinite."""
+
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    numeric = float(value)
+    return numeric == numeric and numeric not in (float("inf"), float("-inf"))
+
+
+def benchmark_scales(
+    records: list[dict[str, Any]], *, require_inference_available: bool = True
+) -> dict[str, BenchmarkScale]:
+    """Measure each `top_scores` category across the models that can be routed to.
+
+    The population is the candidate field, not every record: a model filtered out
+    for unavailable inference is not something the router may choose, so letting
+    it set the bounds would rank the survivors against an option nobody has.
+    """
+
+    populations: dict[str, list[float]] = {}
+    for record in records:
+        inference = record.get("inference") or {}
+        if require_inference_available and not inference.get("available"):
+            continue
+        for name, value in (record.get("top_scores") or {}).items():
+            if _is_scoreable(value):
+                populations.setdefault(str(name), []).append(float(value))
+    return {
+        category: BenchmarkScale(
+            category=category,
+            minimum=min(values),
+            maximum=max(values),
+            count=len(values),
+        )
+        for category, values in populations.items()
+    }
 
 
 @dataclass(frozen=True)
@@ -124,6 +237,7 @@ def build_registry(
     """
 
     overrides = context_window_overrides or {}
+    scales = benchmark_scales(records, require_inference_available=require_inference_available)
     models: list[ModelCapabilities] = []
     providers: dict[str, ProviderCapabilities] = {}
 
@@ -147,12 +261,13 @@ def build_registry(
         if not record.get("context_window"):
             missing_context.append(model_id)
 
-        # top_scores is a {category: normalized_score} map, which lines up with the
-        # router's benchmark_weights vector.
+        # top_scores is {category: raw_score}, and the units differ per category,
+        # so every value is normalized against the field before the router sees
+        # it. See BenchmarkScale and limitation 3 in the module docstring.
         benchmarks = {
-            str(name): float(value)
+            str(name): scales[str(name)].normalize(float(value))
             for name, value in (record.get("top_scores") or {}).items()
-            if isinstance(value, (int, float))
+            if _is_scoreable(value) and str(name) in scales
         }
 
         tools: frozenset[str] = frozenset()
@@ -242,7 +357,27 @@ def build_registry(
         "models_without_providers": len(no_providers),
         "models_skipped_inference_unavailable": len(skipped_unavailable),
         "subscription_provider_ids": sorted(set(subscription_provider_ids)),
+        "benchmark_normalization": "min_max_per_category",
+        "benchmark_scales": {
+            category: scale.to_dict() for category, scale in sorted(scales.items())
+        },
     }
+    degenerate = sorted(category for category, scale in scales.items() if scale.degenerate)
+    if degenerate:
+        report["benchmark_warning"] = (
+            f"{len(degenerate)} benchmark categories cannot rank anything, because "
+            "fewer than two models report them or every model scored the same. "
+            f"Weighting these contributes a flat {NEUTRAL_BENCHMARK_SCORE} to every "
+            f"candidate: {', '.join(degenerate[:5])}"
+        )
+    mixed = sorted(category for category, scale in scales.items() if scale.suspect_mixed_units)
+    if mixed:
+        report["benchmark_mixed_unit_warning"] = (
+            f"{len(mixed)} categories span more than {MIXED_UNIT_RATIO:g}x from "
+            "smallest to largest, which is more than one benchmark produces. Models "
+            "scored low in these may be measured on a different benchmark rather "
+            f"than being worse: {', '.join(mixed[:5])}"
+        )
     if missing_context:
         report["context_warning"] = (
             f"{len(missing_context)} models report no context_window. Any unit that "

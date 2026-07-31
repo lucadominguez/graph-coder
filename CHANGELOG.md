@@ -66,6 +66,17 @@ identities renamed and provenance recorded before any behavior changed.
 - Every CLI failure is JSON with exit 2. `KeyError` and `TypeError` escaped as
   tracebacks with exit 1, which was reachable from any hand-authored
   `route assign --input` payload with a missing or misspelled field.
+- Benchmark scores are min-max normalized per category against the routable field
+  before the router sees them. LLM Stats categories do not share a scale, so the
+  bounded weighted mean pinned every model weighted on a large-scale category to
+  exactly 1.0: quality stopped discriminating and the tie-breakers silently chose
+  the cheapest candidate while the receipt reported a perfect score. The bounds
+  used are recorded per category, a category that ranks nothing yields a neutral
+  0.5 instead of a 0.0 that would read as a bad result, and a category spanning
+  more than 50x is flagged as carrying mixed units.
+- Route receipts carry `benchmark_coverage` and `unscored_benchmark_weights`. A
+  weighted category a model does not report still scores zero, which is the
+  conservative reading, but it is no longer indistinguishable from a bad score.
 - The canonical plan has 16 sections. The unit contract replaces `reviewer` with
   `manager_id` and adds `review_contract`, `context_manifest`, `retry_policy`, and
   `failure_domain`.

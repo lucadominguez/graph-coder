@@ -770,6 +770,10 @@ def _score_candidate(
             "benchmark_version": task.benchmark_version,
             "normalization_version": NORMALIZATION_VERSION,
             "benchmark_weights": dict(sorted(task.benchmark_weights.items())),
+            "benchmark_coverage": round(_benchmark_coverage(task, model), 12),
+            "unscored_benchmark_weights": sorted(
+                name for name in task.benchmark_weights if name not in model.benchmarks
+            ),
             "external_score": round(external, 12),
             "local_score": round(local, 12),
             "quality": round(quality, 12),
@@ -782,6 +786,27 @@ def _score_candidate(
             "expected_passing_cost": round(expected_cost, 12),
         },
     )
+
+
+def _benchmark_coverage(task: TaskRequirements, model: ModelCapabilities) -> float:
+    """Share of the task's weight mass this model actually has evidence for.
+
+    A weighted category the model does not report contributes nothing to the
+    numerator and its full weight to the denominator, so missing evidence scores
+    like a bad result rather than like an unknown. That is the conservative
+    reading and it stays, but it must not be invisible: a candidate losing on
+    absent benchmarks looks identical to one losing on poor ones unless the
+    receipt says which. Coverage is that distinction.
+    """
+
+    weights = task.benchmark_weights or {name: 1.0 for name in model.benchmarks}
+    total_weight = sum(max(0.0, weight) for weight in weights.values())
+    if total_weight <= 0:
+        return 0.0
+    covered = sum(
+        max(0.0, weight) for name, weight in weights.items() if name in model.benchmarks
+    )
+    return _bounded(covered / total_weight)
 
 
 def _external_score(task: TaskRequirements, model: ModelCapabilities) -> float:
