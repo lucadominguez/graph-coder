@@ -212,6 +212,50 @@ def test_director_may_never_write_implementation_code():
     assert "never becomes the implementer of last resort" in text
 
 
+def test_execution_orders_the_director_to_spawn_subagents():
+    """The observed failure this guards: a Director that read the whole skill,
+    understood every role, and then implemented the plan itself in the root
+    session, because nothing ever told it in so many words to spawn anything."""
+
+    text = orchestrator()
+    assert "Execution means spawning subagents" in text
+    assert "runs inside its own freshly spawned subagent" in text
+    assert "you never called your harness's subagent tool, the run failed" in text
+    assert "You do not implement." in text
+    assert "references/dispatch.md" in text
+
+
+def test_dispatch_recipe_names_a_concrete_mechanism_per_harness():
+    dispatch = read("graph-coder/references/dispatch.md")
+    assert "graph-coder jcode emit --graph <graph>" in dispatch
+    assert "task_graph.arguments.nodes` is the spawn list" in dispatch
+    assert "Send it verbatim" in dispatch
+    # Both supported shapes, so no harness is left without an instruction.
+    assert "public `swarm` tool" in dispatch
+    assert "one subagent call per entry" in dispatch
+    # And the refusal, which is what stops a silent degrade into self-implementation.
+    assert "No subagent tool at all" in dispatch
+    assert "Do not silently degrade into implementing the plan" in dispatch
+
+
+def test_self_implementation_is_named_as_a_failure_not_left_implied():
+    text = orchestrator()
+    assert "implementing the units yourself in the root session" in text
+    assert "spawning one subagent for the whole plan instead of one per node" in text
+    # Gates are hard-wrapped prose, so match on collapsed whitespace.
+    gates = " ".join(read("graph-coder/references/phase-gates.md").split())
+    assert "at least one subagent was spawned per dispatchable node" in gates
+    assert "did not execute the graph and does not exit" in gates
+    assert "a confirmed way to spawn subagents in this harness" in gates
+
+
+def test_repairs_are_spawned_too():
+    manager = read("execution-manager/SKILL.md")
+    assert "A `repair_required` verdict is also a spawn" in manager
+    assert "no subagent was spawned, no work happened" in manager
+    assert "Do not fall back to implementing the graph in the foreground session." in manager
+
+
 def test_managers_are_advisory_only_and_cannot_repair():
     manager = read("execution-manager/SKILL.md")
     assert "`repository_write_scope` is empty" in manager

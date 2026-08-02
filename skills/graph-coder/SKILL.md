@@ -14,7 +14,7 @@ Three roles, and the boundaries between them are the product.
 
 | Role | Has | May do | May never do |
 | --- | --- | --- | --- |
-| Frontier Director | Full project state through the kernel, indexes, deltas, and on-demand retrieval | Direct, route, advise, review top-level branch outputs, decide plan mutations | Edit implementation files after execution begins; finish a worker's task |
+| Frontier Director | Full project state through the kernel, indexes, deltas, and on-demand retrieval | Spawn every worker subagent, direct, route, advise, review top-level branch outputs, decide plan mutations | Edit implementation files after execution begins; implement a unit instead of spawning it; finish a worker's task |
 | Manager | Its own subtree, shared branch interfaces, child reports | Advise children, supply bounded context, review child submissions, delegate repair, escalate | Edit repository files; run a repair itself; broaden a child's scope without plan mutation; mark work complete without evidence |
 | Worker | Its unit packet only | Implement its unit, run its commands, request context, submit a report | Read outside its read scope; write outside its write scope; review its own work |
 
@@ -30,6 +30,7 @@ The Director's write scope is explicit and permanent:
 Director may write        plan artifacts, graph artifacts, routing artifacts,
                           events and status, context packets, escalation packets
 Director may write to application code        never
+Director may implement a unit itself          never; it spawns a worker instead
 ```
 
 The Director never becomes the implementer of last resort. When a branch cannot proceed after bounded advice, retry, and fallback, it becomes `human_required`.
@@ -158,7 +159,33 @@ Bind approval to the plan hash, graph hash, route hash, and render hash, and rec
 
 ### 10. DIRECTED_EXECUTION
 
-Invoke `execution-manager`. One loop until the graph is finished or genuinely blocked.
+Invoke `execution-manager`.
+
+**Execution means spawning subagents. Settle this before anything else in the phase.**
+
+Every node in the compiled graph except the Director and its managers runs inside its own freshly spawned subagent. Not a section of your own reply. Not a file you edit yourself. Not a plan you narrate and then carry out because by now you already know what the code should say. If this phase ends and you never called your harness's subagent tool, the run failed, however good the resulting code looks.
+
+You are the Director, and the restriction is the entire point of the role: you spawn, you route, you review, you advise, you record. You do not implement. If you are about to open an implementation file during this phase, stop, because you have skipped dispatch.
+
+Dispatch each round like this. The full worked recipe, including the shape of the emitted packet, is in `references/dispatch.md`.
+
+1. `graph-coder run status` gives the current frontier: every node whose dependencies all reached `completed` through a passing review.
+2. `graph-coder jcode emit --graph <graph>` gives the packets. Its `task_graph` operation carries one entry per dispatchable node, and each entry's `content` is that node's worker packet, already bounded to its read, write, and forbidden scopes. The Director and the managers are excluded from that list by construction, so everything the emit returns is meant to be spawned.
+3. Spawn one subagent per ready node, as one parallel round, with whatever subagent tool the harness exposes: JCode's public `swarm` tool driven by the emitted `task_graph` and `run_plan` operations, or one Task or Agent call per node elsewhere. Pass the node's `content` verbatim as the subagent prompt, with its `model` and `effort` when the route supplies them. Do not paraphrase a packet, do not merge two nodes into one spawn, and do not widen a scope to make a spawn simpler.
+4. Hold to `max_active_workers` (8) and queue the overflow. Never collapse a parallel round into a serial one because sequential felt easier to follow.
+5. Record a dispatch event per spawn before relying on it.
+
+Each of these counts as failing to execute the graph, whatever the final diff looks like:
+
+- implementing the units yourself in the root session, in dependency order;
+- spawning one subagent for the whole plan instead of one per node;
+- spawning subagents to read, research, or summarize, then writing the code yourself;
+- dispatching ready nodes one at a time when several were ready together;
+- moving a node to `completed` on the worker's own say-so, with no manager review.
+
+Manager review is a control-plane act, carried out by the manager agent when the harness gives you one and by you on that manager's behalf otherwise, always against the unit's `review_contract`. A manager is never spawned as an implementation task and never receives a write scope.
+
+Then run one loop until the graph is finished or genuinely blocked.
 
 ```text
 dispatch ready workers with bounded packets
@@ -259,4 +286,4 @@ Every load-bearing claim cites a file, symbol, command result, artifact hash, or
 
 ## STOP/escalation rules
 
-Stop and escalate on: a missing required third-party dependency; user-only product ambiguity; an unresolved conflicting critical claim; a plan that cannot become implementation-ready; a unit with unverifiable acceptance; a graph that would need a reviewer node or a manager with write scope; no route meeting hard requirements; a request to approve without rendering the full plan; a material change after approval; a destructive operation without authorization; secret exposure; a plan, graph, or route hash mismatch; an exhausted escalation ladder; or any recovery that would silently change the approved contract.
+Stop and escalate on: a harness that exposes no way to spawn subagents; a missing required third-party dependency; user-only product ambiguity; an unresolved conflicting critical claim; a plan that cannot become implementation-ready; a unit with unverifiable acceptance; a graph that would need a reviewer node or a manager with write scope; no route meeting hard requirements; a request to approve without rendering the full plan; a material change after approval; a destructive operation without authorization; secret exposure; a plan, graph, or route hash mismatch; an exhausted escalation ladder; or any recovery that would silently change the approved contract.

@@ -34,6 +34,8 @@ review_owner: <manager node id>
 
 Every node also carries: unit IDs, parent owner, dependencies, typed artifact inputs and outputs, read and write scope, acceptance, primary and fallback route, risk, priority, estimated cost, attempt and heartbeat and expansion limits, and failure-isolation domain.
 
+Every node of a kind other than `manage` is a subagent that execution will spawn. Compile with that in mind: a node too vague to hand to a fresh agent that has read nothing else is a node the Director will be tempted to implement itself, which is the one outcome the graph exists to prevent.
+
 ## Invariants
 
 Compilation fails if any of these is violated.

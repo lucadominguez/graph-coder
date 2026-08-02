@@ -227,6 +227,15 @@ or protocol.
 - The Director prompt states that it never edits implementation files.
 - `native_kind(MANAGE)` raises rather than disguising a manager as a worker.
 
+The bundle is a spawn list, not a description of one. Every entry in
+`task_graph.arguments.nodes` is meant to become its own subagent, prompted with
+that entry's `content` verbatim; JCode drives them through the public `swarm` tool
+and any other harness makes one subagent call per entry. A root session that reads
+the bundle and then writes the code itself has produced a diff with none of the
+isolation, review, or cost properties the plan was approved on, so the skills name
+that outcome as a failed run rather than leaving it implied. The recipe and its
+self-check live in `skills/graph-coder/references/dispatch.md`.
+
 Version detection reads `jcode --version` and compares against the v0.55.0 target.
 `/graph-coder` is the orchestration command because JCode dispatches built-ins
 before skill lookup, so `/plan` cannot be safely overridden.

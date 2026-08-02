@@ -63,6 +63,15 @@ A child may request context with a structured request: what it asked, why it nee
 
 Never convert a context request into your own implementation task. Answer it or escalate it.
 
+## Work reaches a node by being spawned into a subagent
+
+Every unit of work in this phase, first attempt and repair alike, runs inside a subagent spawned for it. Nobody in the control plane types the code. If a round of execution passes and no subagent was spawned, no work happened, whatever the repository looks like afterwards.
+
+- The Director spawns one subagent per ready node from the packets in `graph-coder jcode emit --graph <graph>`, as a parallel round bounded by `max_active_workers`. The mechanism, including the emitted packet shape and the harness-specific calls, is in the orchestrator's `references/dispatch.md`.
+- A `repair_required` verdict is also a spawn. Send the bounded defect and repair instructions to a worker subagent, the same worker for the first repair attempt and the fallback worker after that. A manager that applies the repair itself has ended the run's evidence trail, whatever the diff size.
+- A packet goes out verbatim. Summarizing it, merging two nodes into one spawn, or widening a scope to make the spawn simpler all void the contract the node was approved under.
+- If the harness exposes no way to spawn a subagent, stop and say so. Do not fall back to implementing the graph in the foreground session.
+
 ## Event loop
 
 Monitor node ready, claimed, started, heartbeat, blocked, submitted, reviewed, repair, and completed events, plus route and provider state. Rebuild from the Graph Coder ledger rather than chat memory.

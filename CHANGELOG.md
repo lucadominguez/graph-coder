@@ -3,6 +3,34 @@
 All notable changes to Graph Coder. This project follows semantic versioning once
 it reaches 1.0; until then, minor versions may change contracts.
 
+## [Unreleased]
+
+### Fixed
+
+- **Execution now tells the Director to spawn, in so many words.** A real run
+  reached `DIRECTED_EXECUTION` and the root session implemented the plan itself
+  instead of dispatching workers. Nothing in the skills was wrong, and nothing in
+  them said "spawn a subagent" either: phase 10 described dispatch as a state
+  machine, and `graph-coder jcode emit` was listed under Commands without ever
+  appearing in the lifecycle that consumes it. Phase 10 now opens with the
+  mandate, names self-implementation as a failed run rather than a shortcut, and
+  walks the round: read the frontier, emit the packets, spawn one subagent per
+  ready node in parallel, hold `max_active_workers`, record the dispatch events.
+
+### Added
+
+- **`skills/graph-coder/references/dispatch.md`**: the mechanism behind that
+  mandate. The shape of the emitted `task_graph` bundle, the instruction to pass
+  each node's `content` verbatim, the JCode `swarm` path and the one-call-per-node
+  path for every other harness, the refusal to run at all when a harness exposes
+  no subagent tool, and a five-item self-check that fails a run which produced
+  code without spawns.
+- Phase-gate entry and exit conditions for `DIRECTED_EXECUTION` covering spawn
+  capability, one spawn per dispatchable node, and no root-session writes, plus a
+  `ready -> running` gate that a node reaches only once a subagent holds it.
+- `execution-manager` now states that repairs are spawns too, and that a control
+  plane with no subagent tool stops rather than falling back to the foreground.
+
 ## [0.1.0] - 2026-07-30
 
 First release. Graph Coder is an independent repository seeded from the Agent

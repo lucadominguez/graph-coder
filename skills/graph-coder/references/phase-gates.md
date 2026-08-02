@@ -145,12 +145,16 @@ does not satisfy it, however long the plan is.
 
 ## 10. DIRECTED_EXECUTION
 
-**Enter** with a recorded approval whose four hashes still match current state.
+**Enter** with a recorded approval whose four hashes still match current state, and
+with a confirmed way to spawn subagents in this harness. Without one, stop here and
+say so; a Graph Coder graph cannot be executed by the root session alone.
 
 **Exit** when every node is `completed` through a passing manager review, or is
 `human_required` with its blocked descendants recorded and every independent branch
 carried as far as it can go; and the Definition of Done is met with fresh command
-output.
+output. Exit also requires that at least one subagent was spawned per dispatchable
+node and that the root session wrote no implementation file during the phase. A run
+that produced code without spawns did not execute the graph and does not exit.
 
 **Stop** and escalate on a hash mismatch against the approval, a destructive
 operation without authorization, secret exposure, an unsafe write conflict, global
@@ -161,6 +165,8 @@ Per-node gates during execution:
 
 - A node becomes `ready` only when every dependency reached `completed` through a
   passing manager review.
+- A node moves from `ready` to `running` only when a subagent has been spawned for
+  it with its emitted packet. The Director doing the work is not a running node.
 - A worker moves to `awaiting_review` on submitting a complete report.
 - Only a `pass` verdict moves it to `completed`.
 - `repair_required` returns it to a worker, with bounded defects and instructions.
