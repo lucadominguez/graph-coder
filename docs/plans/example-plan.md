@@ -338,6 +338,13 @@ Every unit declares `local` as primary and fallback so the example compiles with
 network evidence. Real routing replaces these through `route assign`, which refuses
 to run on stale LLM Stats data. See `docs/plans/example-route-request.json`.
 
+**`local` is a placeholder, not a route, and it must never reach execution.** Copying
+this file as a plan template and running it as-is skips phase 8 entirely: the workers
+spawn on whatever default model the harness supplies, no route receipt exists, and
+the plan's cost estimate describes a run that did not happen. That has already
+happened once. Run `route refresh` and `route assign` before compiling for a real
+graph, and treat `model: "local"` in an emitted packet as a stop condition.
+
 ## Context Contract
 
 No unit receives the repository. Each gets its own files, its dependency artifacts,

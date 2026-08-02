@@ -485,7 +485,12 @@ def _graph_from_plan(path: Path) -> ExecutionGraph:
                 route=RouteSpec(
                     adapter="jcode",
                     model=unit.primary_route,
-                    spawn_mode="headless",
+                    # Visible, not headless. A headless worker does the work and
+                    # never appears in `swarm list`, so the Director cannot see it
+                    # start, stall, or finish, and the status roster it is required
+                    # to keep becomes fiction. Observability is part of the
+                    # contract, so it is the default rather than an option.
+                    spawn_mode="visible",
                     capabilities=sorted(str(key) for key in unit.capability_profile),
                 ),
                 risk=unit.risk,
@@ -931,6 +936,9 @@ def _cmd_jcode_emit(args: argparse.Namespace) -> JsonObject:
     payload = {
         "ok": True,
         "compatibility": adapter.compatibility(),
+        # Read this before dispatching. `ready_to_dispatch: false` means the graph
+        # will run, but not the run that was approved.
+        "preflight": adapter.preflight(graph),
         "operations": [operation.to_dict() for operation in adapter.operation_bundle(graph)],
         "report_schema": load_schema("worker_report"),
     }

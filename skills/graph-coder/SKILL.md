@@ -139,6 +139,8 @@ Run `graph-coder graph compile --plan <plan> --output <graph>` then `graph-coder
 
 Invoke `routing-plan`. Routing is deterministic: the same registry and unit always produce the same route.
 
+**This phase is not optional and cannot be satisfied by a plan that already names routes.** Run `graph-coder route refresh`, then `graph-coder route assign` per unit. A plan authored before this phase carries `primary_route: local`, which is the placeholder that lets a plan compile without network evidence. It is not a route. If `local` survives into the graph, the workers run on whatever default model the harness hands them, unrouted and unmetered, and every cost figure in the approved plan is fiction. Skipping this phase is the cheapest-looking mistake in the lifecycle and the one that quietly removes the reason the system exists.
+
 - The Director is pinned to the configured frontier model and is never silently downgraded.
 - Managers are routed for advice, review, context window, and tool requirements.
 - Workers are routed for the lowest expected cost of a passing result, not the lowest sticker price.
@@ -169,11 +171,13 @@ You are the Director, and the restriction is the entire point of the role: you s
 
 Dispatch each round like this. The full worked recipe, including the shape of the emitted packet, is in `references/dispatch.md`.
 
+0. Preflight. Run `swarm cleanup --force` to clear plan nodes left by earlier sessions, which otherwise merge into yours and produce a graph many times the size of the one you compiled. Then read the `preflight` block that `graph-coder jcode emit` returns and stop unless `ready_to_dispatch` is true. It fails when a node still carries the placeholder route `local`, which means phase 8 was skipped and the workers will run on whatever default the harness supplies, and when a node would spawn without `spawn_mode: visible`, which does the work invisibly, absent from `swarm list`, leaving you a status roster you cannot honestly fill in.
 1. `graph-coder run status` gives the current frontier: every node whose dependencies all reached `completed` through a passing review.
 2. `graph-coder jcode emit --graph <graph>` gives the packets. Its `task_graph` operation carries one entry per dispatchable node, and each entry's `content` is that node's worker packet, already bounded to its read, write, and forbidden scopes. The Director and the managers are excluded from that list by construction, so everything the emit returns is meant to be spawned.
-3. Spawn one subagent per ready node, as one parallel round, with whatever subagent tool the harness exposes: JCode's public `swarm` tool driven by the emitted `task_graph` and `run_plan` operations, or one Task or Agent call per node elsewhere. Pass the node's `content` verbatim as the subagent prompt, with its `model` and `effort` when the route supplies them. Do not paraphrase a packet, do not merge two nodes into one spawn, and do not widen a scope to make a spawn simpler.
-4. Hold to `max_active_workers` (8) and queue the overflow. Never collapse a parallel round into a serial one because sequential felt easier to follow.
-5. Record a dispatch event per spawn before relying on it.
+3. Spawn one subagent per ready node with whatever subagent tool the harness exposes. In JCode that is one `swarm spawn` per node, carrying the node's `content` verbatim as the prompt, its `id` as the label, its routed model, and `--spawn_mode visible`. Issue the whole round in one message. The emitted `run_plan` batch path exists but is brittle, having failed on both stale plan pollution and coordinator assignment errors; when it errors, fall back to per-node spawns rather than debugging it. Do not paraphrase a packet, do not merge two nodes into one spawn, and do not widen a scope to make a spawn simpler.
+4. Spawn width comes from the dependency DAG. Independent nodes go together, up to `max_active_workers` (8), and never one at a time because sequential felt easier to follow. A linear chain such as `IU-STORE -> IU-BACKEND -> IU-FRONTEND` goes one at a time by necessity: spawn, wait for the artifacts, verify, review, then spawn the next. A worker handed a repository that does not yet contain what its packet told it to build on will fail for a reason the plan never predicted.
+5. Verify from the filesystem and from commands, not by waiting for a swarm report. Check that the node's `write_scopes` changed, run the unit's verification commands, and quote the real output. That evidence is what the `review_owner` reviews. A worker that never joined the swarm still did its work; absence from `swarm list` is not failure, and a worker's own claim of success is not evidence.
+6. Record a dispatch event per spawn before relying on it.
 
 Each of these counts as failing to execute the graph, whatever the final diff looks like:
 
@@ -181,6 +185,9 @@ Each of these counts as failing to execute the graph, whatever the final diff lo
 - spawning one subagent for the whole plan instead of one per node;
 - spawning subagents to read, research, or summarize, then writing the code yourself;
 - dispatching ready nodes one at a time when several were ready together;
+- spawning a dependent node before its predecessor's artifacts exist;
+- spawning headless or inline, so no worker is visible or monitorable;
+- dispatching packets that still carry the placeholder route `local`;
 - moving a node to `completed` on the worker's own say-so, with no manager review.
 
 Manager review is a control-plane act, carried out by the manager agent when the harness gives you one and by you on that manager's behalf otherwise, always against the unit's `review_contract`. A manager is never spawned as an implementation task and never receives a write scope.

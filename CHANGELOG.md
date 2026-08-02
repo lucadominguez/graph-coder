@@ -17,8 +17,31 @@ it reaches 1.0; until then, minor versions may change contracts.
   walks the round: read the frontier, emit the packets, spawn one subagent per
   ready node in parallel, hold `max_active_workers`, record the dispatch events.
 
+- **Workers spawned invisibly.** `graph compile` hardcoded `spawn_mode="headless"`
+  and the JCode adapter never emitted the field at all, so it was dead in the
+  bundle and the harness picked its own default. Headless and inline workers do
+  the work and never appear in `swarm list`, which leaves the Director unable to
+  see a worker start, stall, or finish and makes the status roster it is required
+  to keep fiction. The compiler now defaults to `visible` and the adapter emits it
+  on every task.
+- **`MODEL_ROUTING` was skippable in practice, and got skipped.** A run reached
+  execution with `primary_route: local` on every unit, so `route refresh` and
+  `route assign` never ran and the workers took whatever default model the harness
+  supplied, unrouted and unmetered, while the approved plan's cost estimate
+  described a run that did not happen. `local` is the placeholder that lets the
+  shipped example plan compile without network evidence, and copying that example
+  is how it spreads. Phase 8 now states it is not optional, its gate refuses a
+  graph still holding a placeholder, and `docs/plans/example-plan.md` says in the
+  file itself that `local` must never reach execution.
+
 ### Added
 
+- **`jcode emit` returns a `preflight` block**: `ready_to_dispatch`, the unrouted
+  nodes, the nodes that would spawn invisibly, and a warning naming the fix for
+  each. It reports rather than raises, because the unrouted example plan must
+  still emit for the quickstart, and the skill tells the Director to stop unless
+  `ready_to_dispatch` is true. This is the machine-checkable version of two rules
+  that prose alone did not hold.
 - **`skills/graph-coder/references/dispatch.md`**: the mechanism behind that
   mandate. The shape of the emitted `task_graph` bundle, the instruction to pass
   each node's `content` verbatim, the JCode `swarm` path and the one-call-per-node
@@ -30,6 +53,20 @@ it reaches 1.0; until then, minor versions may change contracts.
   `ready -> running` gate that a node reaches only once a subagent holds it.
 - `execution-manager` now states that repairs are spawns too, and that a control
   plane with no subagent tool stops rather than falling back to the foreground.
+- Field-tested dispatch guidance, all of it from one real run. `swarm cleanup
+  --force` before emitting, because plan nodes left by an earlier session merge
+  into yours and turned a 3-node graph into 55. The literal `swarm spawn --label
+  ... --spawn_mode visible` call, because "spawn one subagent per ready node" left
+  the actual tool call to be guessed. `run_plan` documented as the brittle batch
+  path with per-node spawns as the stated fallback, after it failed on both stale
+  plans and `Only the coordinator can assign tasks.` Completion verified from the
+  filesystem and the unit's verification commands rather than by waiting on a
+  swarm report, since a worker that never joined the swarm still did its work.
+  Spawn width taken from the dependency DAG in both directions: parallel where
+  nodes are independent, and one at a time down a chain like
+  `IU-STORE -> IU-BACKEND -> IU-FRONTEND`, where spawning all three at once hands
+  the later workers a repository that lacks what their packets told them to build
+  on.
 
 ## [0.1.0] - 2026-07-30
 

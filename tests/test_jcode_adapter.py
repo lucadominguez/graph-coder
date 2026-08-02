@@ -9,9 +9,10 @@ from graph_coder.errors import CompatibilityError
 from graph_coder.graph import ExecutionGraph, GraphNode, NodeKind, ReviewPolicy, RouteSpec
 
 
-def sample_graph(capabilities: list[str] | None = None) -> ExecutionGraph:
+def sample_graph(capabilities: list[str] | None = None, model: str | None = None) -> ExecutionGraph:
     """A Director, one advisory manager, and the workers it reviews."""
 
+    worker_route = RouteSpec(model=model)
     return ExecutionGraph(
         nodes=[
             GraphNode(
@@ -44,6 +45,7 @@ def sample_graph(capabilities: list[str] | None = None) -> ExecutionGraph:
                 acceptance=["constraints listed"],
                 review=ReviewPolicy(required=True, checklist=["evidence cited"]),
                 review_owner="manager",
+                route=worker_route,
             ),
             GraphNode(
                 id="implement",
@@ -54,6 +56,7 @@ def sample_graph(capabilities: list[str] | None = None) -> ExecutionGraph:
                 write_scopes=["src/app.py"],
                 acceptance=["tests pass"],
                 review_owner="manager",
+                route=worker_route,
             ),
             GraphNode(
                 id="verify",
@@ -63,6 +66,7 @@ def sample_graph(capabilities: list[str] | None = None) -> ExecutionGraph:
                 read_scopes=["src/app.py"],
                 acceptance=["compatibility suite passes"],
                 review_owner="manager",
+                route=worker_route,
             ),
         ]
     )
@@ -164,6 +168,33 @@ def test_every_worker_prompt_names_its_manager_and_review_contract() -> None:
         assert "you do not mark yourself complete" in task["content"]
         assert task["metadata"]["review_owner"] == "manager"
         assert task["metadata"]["authority"] == "implementation"
+
+
+def test_every_task_carries_a_visible_spawn_mode() -> None:
+    """A headless or inline worker does the work and never appears in `swarm list`,
+    so the Director cannot monitor it and the status roster becomes fiction. The
+    adapter emits the mode rather than leaving the harness to pick its own."""
+
+    adapter = JCodeAdapter(version_output="jcode v0.55.0")
+    for task in adapter.task_graph_bundle(sample_graph()).arguments["nodes"]:
+        assert task["spawn_mode"] == "visible"
+
+
+def test_preflight_flags_an_unrouted_graph_rather_than_dispatching_it() -> None:
+    """The observed failure: MODEL_ROUTING was skipped, every packet shipped the
+    example plan's `local` placeholder, and the workers silently ran on the
+    harness default. Reported, not raised, so the unrouted example still emits."""
+
+    adapter = JCodeAdapter(version_output="jcode v0.55.0")
+    report = adapter.preflight(sample_graph(model="local"))
+    assert report["ready_to_dispatch"] is False
+    assert report["unrouted_nodes"]
+    assert "MODEL_ROUTING was skipped" in report["warnings"][0]
+
+    routed = adapter.preflight(sample_graph(model="claude-sonnet-5"))
+    assert routed["ready_to_dispatch"] is True
+    assert routed["unrouted_nodes"] == []
+    assert routed["warnings"] == []
 
 
 def test_prompts_and_reports_preserve_acceptance_review_and_scope_context() -> None:

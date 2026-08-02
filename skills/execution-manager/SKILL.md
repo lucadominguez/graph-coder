@@ -70,6 +70,8 @@ Every unit of work in this phase, first attempt and repair alike, runs inside a 
 - The Director spawns one subagent per ready node from the packets in `graph-coder jcode emit --graph <graph>`, as a parallel round bounded by `max_active_workers`. The mechanism, including the emitted packet shape and the harness-specific calls, is in the orchestrator's `references/dispatch.md`.
 - A `repair_required` verdict is also a spawn. Send the bounded defect and repair instructions to a worker subagent, the same worker for the first repair attempt and the fallback worker after that. A manager that applies the repair itself has ended the run's evidence trail, whatever the diff size.
 - A packet goes out verbatim. Summarizing it, merging two nodes into one spawn, or widening a scope to make the spawn simpler all void the contract the node was approved under.
+- Spawn visibly. A worker spawned headless or inline does the work and never appears in `swarm list`, which makes the status roster below unfillable: no start, no heartbeat, no elapsed time, nothing to reconcile after a reload. Every emitted task carries `spawn_mode: visible`; pass it through.
+- Completion is confirmed from the filesystem and from commands, never from waiting on a swarm report. Check that the node's write scope changed, run the unit's verification commands, and quote the real output. A worker that never joined the swarm still did its work, so absence from the roster is a monitoring gap to report, not a failure to retry.
 - If the harness exposes no way to spawn a subagent, stop and say so. Do not fall back to implementing the graph in the foreground session.
 
 ## Event loop

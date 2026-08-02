@@ -122,6 +122,13 @@ makes resume and recovery meaningful.
 provider-diverse fallback; the Director is pinned to the configured frontier model;
 every route emitted a receipt; and the cost estimate states its assumptions.
 
+A route the plan carried in before this phase is not an exit. `local` is the
+placeholder that lets an example plan compile without network evidence, so a graph
+still holding `local` after phase 8 means the phase did not run. Exit requires a
+receipt per node produced by `route assign` against refreshed evidence. Every phase
+in this lifecycle is mandatory; this is the one that gets skipped, because a plan
+that already names something in its route field looks finished.
+
 **Stop** when no model meets a node's hard requirements, when the evidence
 confidence floor fails, when credentials are unavailable and no policy-valid cache
 exists, or when routing would silently substitute the Director's model.
@@ -147,7 +154,9 @@ does not satisfy it, however long the plan is.
 
 **Enter** with a recorded approval whose four hashes still match current state, and
 with a confirmed way to spawn subagents in this harness. Without one, stop here and
-say so; a Graph Coder graph cannot be executed by the root session alone.
+say so; a Graph Coder graph cannot be executed by the root session alone. Enter also
+requires a cleared swarm (`swarm cleanup --force`), routed models rather than
+`local`, and `spawn_mode: visible` on every emitted task.
 
 **Exit** when every node is `completed` through a passing manager review, or is
 `human_required` with its blocked descendants recorded and every independent branch

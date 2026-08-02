@@ -231,7 +231,7 @@ def test_dispatch_recipe_names_a_concrete_mechanism_per_harness():
     assert "task_graph.arguments.nodes` is the spawn list" in dispatch
     assert "Send it verbatim" in dispatch
     # Both supported shapes, so no harness is left without an instruction.
-    assert "public `swarm` tool" in dispatch
+    assert "swarm spawn --label" in dispatch
     assert "one subagent call per entry" in dispatch
     # And the refusal, which is what stops a silent degrade into self-implementation.
     assert "No subagent tool at all" in dispatch
@@ -247,6 +247,63 @@ def test_self_implementation_is_named_as_a_failure_not_left_implied():
     assert "at least one subagent was spawned per dispatchable node" in gates
     assert "did not execute the graph and does not exit" in gates
     assert "a confirmed way to spawn subagents in this harness" in gates
+
+
+def test_dispatch_preflight_covers_the_three_observed_failures():
+    """From a real run: stale swarm plans merged a 3-node graph into 55 nodes,
+    phase 8 was skipped so every packet shipped model `local`, and inline spawns
+    left the workers invisible to `swarm list`."""
+
+    # Hard-wrapped prose, so match on collapsed whitespace.
+    dispatch = " ".join(read("graph-coder/references/dispatch.md").split())
+    assert "swarm cleanup --force" in dispatch
+    assert "`local` is the example plan's compile placeholder, not a route" in dispatch
+    assert "never appears in `swarm list`" in dispatch
+    text = orchestrator()
+    assert "swarm cleanup --force" in text
+    assert "stop unless `ready_to_dispatch` is true" in text
+    assert "without `spawn_mode: visible`" in text
+    # The block the skill tells the Director to read is documented where it looks.
+    assert '"ready_to_dispatch": false' in dispatch
+
+
+def test_dispatch_shows_the_actual_spawn_call():
+    dispatch = read("graph-coder/references/dispatch.md")
+    assert "swarm spawn --label" in dispatch
+    assert "--spawn_mode visible" in dispatch
+    # run_plan is documented as the brittle path, with a stated fallback.
+    assert "Only the coordinator can assign tasks." in dispatch
+    assert "drop to per-node" in dispatch
+
+
+def test_spawn_width_follows_the_dag_in_both_directions():
+    dispatch = read("graph-coder/references/dispatch.md")
+    assert "linear chain         spawn one, verify, then spawn the next" in dispatch
+    assert "IU-STORE -> IU-BACKEND -> IU-FRONTEND" in dispatch
+    assert "The reverse mistake costs just as much" in dispatch
+
+
+def test_completion_is_verified_from_the_filesystem_not_the_swarm():
+    dispatch = read("graph-coder/references/dispatch.md")
+    assert "Do not sit waiting for a swarm report" in dispatch
+    assert "does its job either way" in dispatch
+    assert "neither is its absence from `swarm list`" in dispatch
+    manager = read("execution-manager/SKILL.md")
+    assert "confirmed from the filesystem and from commands" in manager
+    assert "still did its work" in manager
+
+
+def test_routing_phase_is_not_skippable_and_local_is_not_a_route():
+    """The run that prompted this skipped phase 8 outright, because the plan
+    already had something in its route field."""
+
+    text = orchestrator()
+    assert "This phase is not optional" in text
+    assert "It is not a route." in text
+    gates = " ".join(read("graph-coder/references/phase-gates.md").split())
+    assert "a graph still holding `local` after phase 8 means the phase did not run" in gates
+    example = (ROOT / "docs/plans/example-plan.md").read_text(encoding="utf-8")
+    assert "placeholder, not a route, and it must never reach execution" in example
 
 
 def test_repairs_are_spawned_too():

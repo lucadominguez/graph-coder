@@ -22,6 +22,11 @@ from graph_coder.graph import (
 )
 
 TARGET_VERSION = "0.55.0"
+
+#: Route values that mean "nothing was routed here". `local` is what an example
+#: plan carries so it can compile without network evidence; it is not a model, and
+#: a graph still holding one at dispatch time did not run MODEL_ROUTING.
+PLACEHOLDER_ROUTES = frozenset({"local", "default", "", "tbd"})
 SUPPORTED_CAPABILITIES = {
     "task_graph",
     "run_plan",
@@ -175,6 +180,49 @@ class JCodeAdapter:
     def operation_bundle(self, graph: ExecutionGraph) -> list[JCodeOperation]:
         return [self.task_graph_bundle(graph), self.run_plan_bundle(graph)]
 
+    def preflight(self, graph: ExecutionGraph) -> dict[str, Any]:
+        """Report whether this graph is fit to dispatch, in machine-readable form.
+
+        Both checks exist because a real run failed them silently. Phase 8 was
+        skipped, so every node still carried the example plan's `local` placeholder
+        and the workers ran on whatever default the harness supplied, unrouted and
+        unmetered. The spawns were invisible, so nothing could be monitored.
+
+        This reports rather than raises: the shipped example plan is deliberately
+        unrouted so it compiles without network evidence, and refusing to emit it
+        would break the quickstart. The Director is told, in terms it can check,
+        that the graph is not ready.
+        """
+
+        nodes = self.dispatchable(graph)
+        unrouted = sorted(
+            node.id for node in nodes if (node.route.model or "") in PLACEHOLDER_ROUTES
+        )
+        invisible = sorted(
+            node.id for node in nodes if (node.route.spawn_mode or "visible") != "visible"
+        )
+        warnings: list[str] = []
+        if unrouted:
+            warnings.append(
+                f"{len(unrouted)} nodes carry a placeholder route instead of a routed "
+                "model, which means MODEL_ROUTING was skipped. Run `graph-coder route "
+                "refresh` then `graph-coder route assign` before dispatching: "
+                + ", ".join(unrouted[:5])
+            )
+        if invisible:
+            warnings.append(
+                f"{len(invisible)} nodes would spawn without spawn_mode=visible and "
+                "would not appear in `swarm list`, leaving them unmonitorable: "
+                + ", ".join(invisible[:5])
+            )
+        return {
+            "ready_to_dispatch": not warnings,
+            "dispatchable_nodes": len(nodes),
+            "unrouted_nodes": unrouted,
+            "non_visible_nodes": invisible,
+            "warnings": warnings,
+        }
+
     def director_prompt(self, graph: ExecutionGraph) -> str:
         # Managers and the Director coordinate; they are not dispatched work.
         units = [
@@ -238,6 +286,11 @@ class JCodeAdapter:
             task["model"] = node.route.model
         if node.route.effort:
             task["effort"] = node.route.effort
+        # Emitted so the Director passes it to the spawn call. Without it the
+        # harness picks its own default, which has been headless, and the workers
+        # run invisibly: no `swarm list` entry, nothing to monitor, nothing to
+        # reconcile after a reload.
+        task["spawn_mode"] = node.route.spawn_mode or "visible"
         if node.role == NodeRole.COMPOSITE and node.children:
             task["children"] = list(node.children)
         return task
