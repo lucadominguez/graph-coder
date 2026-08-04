@@ -174,3 +174,46 @@ def test_provisional_documented_endpoint_mapping(
         "/api/v1/models/recent",
         "/api/v1/models/open%2Fmodel/benchmarks",
     ]
+
+
+def test_auth_failure_quotes_the_api_message_and_names_the_remedy(
+    fake_server: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A real run read a bare `HTTP 401` as a permission problem, abandoned
+    routing, and hand-picked a model. The body says what is actually wrong and
+    where to fix it, so the error carries it."""
+
+    monkeypatch.setenv("LLM_STATS_API_KEY", "expired-token")
+    FakeStatsHandler.responses = [
+        (
+            401,
+            {},
+            {
+                "error": {
+                    "code": "invalid_api_key",
+                    "message": "Invalid API key. Create or manage your keys at "
+                    "https://llm-stats.com/settings?tab=api-keys",
+                }
+            },
+        )
+    ]
+    client = LLMStatsClient(base_url=fake_server, max_retries=0)
+
+    with pytest.raises(LLMStatsError) as raised:
+        client.fetch_models()
+
+    message = str(raised.value)
+    assert "HTTP 401" in message
+    assert "Invalid API key" in message
+    assert "invalid, expired, or lacks access rather than missing" in message
+    assert "https://llm-stats.com/settings?tab=api-keys" in message
+    assert "Do not hand-pick a model" in message
+    # The key itself must never reach an error string.
+    assert "expired-token" not in message
+
+
+def test_timeout_budget_outlasts_this_apis_slow_auth_failures() -> None:
+    """Measured 2026-08-03: the live API takes ~24s to return a 401. At the old
+    10s default the client timed out first and the message was never read."""
+
+    assert LLMStatsClient().timeout >= 30.0

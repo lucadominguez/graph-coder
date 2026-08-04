@@ -135,17 +135,51 @@ The reverse mistake costs just as much: serializing nodes that share no dependen
 edge, because watching one at a time felt easier. Recompute the frontier after each
 round of verdicts and spawn everything it contains.
 
+## While a worker runs, watch two things at once
+
+The filesystem and the swarm answer different questions, and neither answers the
+other's:
+
+```text
+filesystem   is it done?      write scope changed, artifacts exist
+swarm status is it alive?     running, rate-limited, errored, dead
+```
+
+Polling only the filesystem is the trap. A worker blocked on a `429` produces no
+files, and so does a worker that is thinking hard. They look identical from the
+directory listing. One real run polled for `backend.py` for two minutes while the
+worker sat rate-limited the whole time, because `swarm status` was never checked.
+
+Each monitoring cycle, check both: the write scope for progress, and `swarm status`
+(or `swarm list`) for the worker's health. This is what the 30-second silence rule
+in `execution-manager` is asking you to detect, and it is only detectable if you
+look at the health signal. Progress on either axis resets the timer.
+
+Classify what the health signal shows before reacting:
+
+- **rate limited (`429`)**: transient infrastructure, never model incapability. Wait
+  out `Retry-After` if it is short, or fall back to the provider-diverse route.
+  Do not respawn the node on top of a worker that is still alive and waiting.
+- **errored or dead**: a real attempt, so count it against `max_attempts` and follow
+  the escalation ladder.
+- **running with no output**: keep waiting while the silence timer allows, then
+  surface it with bounded cancel, continue, or fallback options.
+
+Never respawn a node whose worker is still alive. Two workers in one write scope is
+the write conflict the graph was compiled to prevent.
+
 ## Verifying a worker finished
 
-Do not sit waiting for a swarm report. A worker writes to its write scope, so the
-Director confirms completion from the filesystem and from commands:
+Do not treat a swarm report as the completion evidence. A worker writes to its write
+scope, so the Director confirms completion from the filesystem and from commands:
 
 1. The files named in the node's `write_scopes` exist and have changed.
 2. The unit's verification commands run and pass, with the real output quoted.
 3. The acceptance criteria in the packet are met by that output.
 
 That evidence is what goes to the `review_owner`. A worker's own claim that it
-finished is not evidence, and neither is its absence from `swarm list`.
+finished is not evidence, and neither is its absence from `swarm list`: absence
+means you cannot monitor it, which is a gap to report, not a verdict either way.
 
 ## Round discipline
 
@@ -170,6 +204,10 @@ Before reporting execution finished, confirm all of these:
 - [ ] The number of subagents spawned is at least the number of dispatchable nodes.
 - [ ] No implementation file was written by the root session during phase 10.
 - [ ] Every spawn used `spawn_mode: visible` and a real routed model, never `local`.
+- [ ] Worker health was polled alongside the filesystem, so no worker sat blocked
+      on a rate limit unnoticed.
+- [ ] Any routing done without LLM Stats was declared as degraded evidence, with
+      its candidates and basis recorded, not quietly hand-picked.
 - [ ] Every completed node has a manager review artifact with acceptance results,
       backed by filesystem evidence and fresh command output.
 - [ ] Every spawn used its emitted packet, not a summary of it.

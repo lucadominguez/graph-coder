@@ -17,6 +17,28 @@ it reaches 1.0; until then, minor versions may change contracts.
   walks the round: read the frontier, emit the packets, spawn one subagent per
   ready node in parallel, hold `max_active_workers`, record the dispatch events.
 
+- **An auth failure read as a permission wall, and routing was abandoned.** The
+  client raised a bare `LLM Stats request failed with HTTP 401`, discarding the
+  response body that says `Invalid API key. Create or manage your keys at ...`.
+  A run read the code as "no access", fell back to `swarm list_models`, and
+  hand-picked a model with no receipt. The error now quotes the API's own message
+  and, for `401` and `403`, states that the key is invalid, expired, or lacks
+  access rather than missing, and where to regenerate it.
+- **The client timed out before that message could arrive.** Measured on
+  2026-08-03, this API takes about 24 seconds to return an auth failure, against a
+  10-second default timeout, so a bad key surfaced as a generic timeout. The
+  default is now 45 seconds; success paths are fast, and the budget exists for the
+  error path.
+- **Liveness and completion were the same signal, and neither covered the gap.**
+  The previous release said to verify completion from the filesystem rather than
+  waiting on a swarm report, which is right about completion and wrong as the only
+  poll. A worker blocked on a `429` writes nothing, exactly like a worker that is
+  thinking. One run watched a directory for two minutes while its worker sat rate
+  limited. Dispatch now separates the two questions: the filesystem answers "is it
+  done", `swarm status` answers "is it alive", and both are polled every cycle.
+  Rate limits are classed as transient infrastructure, with the standing rule that
+  a node whose worker is still alive is never respawned, because two workers in one
+  write scope is the write conflict the graph exists to prevent.
 - **Workers spawned invisibly.** `graph compile` hardcoded `spawn_mode="headless"`
   and the JCode adapter never emitted the field at all, so it was dead in the
   bundle and the harness picked its own default. Headless and inline workers do
@@ -36,6 +58,13 @@ it reaches 1.0; until then, minor versions may change contracts.
 
 ### Added
 
+- **A declared degraded-routing path** in `routing-plan`, for when LLM Stats is
+  genuinely unreachable and no policy-valid cache exists. Routing from the
+  harness's own model list is legitimate; doing it silently is not. The path
+  requires `routing_evidence: harness_model_list`, no benchmark scores, selection
+  on hard filters and price alone, the full candidate list, and an explicit
+  degradation notice at full-plan approval, because the user is otherwise
+  approving a cost estimate built on weaker evidence than the plan format implies.
 - **`jcode emit` returns a `preflight` block**: `ready_to_dispatch`, the unrouted
   nodes, the nodes that would spawn invisibly, and a warning naming the fix for
   each. It reports rather than raises, because the unrouted example plan must

@@ -285,12 +285,52 @@ def test_spawn_width_follows_the_dag_in_both_directions():
 
 def test_completion_is_verified_from_the_filesystem_not_the_swarm():
     dispatch = read("graph-coder/references/dispatch.md")
-    assert "Do not sit waiting for a swarm report" in dispatch
+    # Scoped to completion evidence. Liveness is the swarm's job, asserted in
+    # test_liveness_and_completion_are_separate_signals; the two must not be
+    # collapsed back into "ignore the swarm".
+    assert "Do not treat a swarm report as the completion evidence" in dispatch
     assert "does its job either way" in dispatch
     assert "neither is its absence from `swarm list`" in dispatch
     manager = read("execution-manager/SKILL.md")
     assert "confirmed from the filesystem and from commands" in manager
     assert "still did its work" in manager
+
+
+def test_liveness_and_completion_are_separate_signals():
+    """The observed failure: the Director polled the filesystem for an output file
+    for two minutes while the worker sat on a 429, because a blocked worker and a
+    working one look identical on disk."""
+
+    dispatch = read("graph-coder/references/dispatch.md")
+    assert "filesystem   is it done?" in dispatch
+    assert "swarm status is it alive?" in dispatch
+    assert "Polling only the filesystem is the trap" in dispatch
+    assert "Never respawn a node whose worker is still alive" in dispatch
+    manager = read("execution-manager/SKILL.md")
+    assert "Watch both signals every cycle" in manager
+    assert "a silent worker and a rate-limited one look the same on disk" in manager
+
+
+def test_rate_limits_are_classed_as_transient_not_incapability():
+    dispatch = read("graph-coder/references/dispatch.md")
+    assert "transient infrastructure, never model incapability" in dispatch
+    manager = read("execution-manager/SKILL.md")
+    assert "A rate limit (`429`) is transient infrastructure" in manager
+    # Pre-existing rule this builds on, so the two cannot drift apart.
+    assert "Never treat a provider outage as model incapability" in manager
+
+
+def test_unavailable_evidence_has_a_declared_degraded_path():
+    """A run hit an auth failure, hand-picked a cheap model, and carried on with no
+    receipt. The fallback is legitimate; doing it silently is not."""
+
+    routing = read("routing-plan/SKILL.md")
+    assert "When the evidence source is unavailable" in routing
+    assert "routing_evidence: harness_model_list" in routing
+    assert "swarm list_models" in routing
+    assert "What makes this a failure is doing it silently" in routing
+    # The auth remedy, so 401/403 is not read as "routing is impossible".
+    assert "invalid, expired, or lacks access rather than missing" in routing
 
 
 def test_routing_phase_is_not_skippable_and_local_is_not_a_route():

@@ -60,7 +60,11 @@ class LLMStatsClient:
         self,
         *,
         base_url: str = DEFAULT_API_BASE,
-        timeout: float = 10.0,
+        # Measured 2026-08-03: this API takes ~24s to return an auth failure. At
+        # the previous 10s default the client timed out before the 401 arrived, so
+        # a bad key surfaced as a generic timeout and the real message was never
+        # read. Success paths are fast; this budget exists for the error path.
+        timeout: float = 45.0,
         max_retries: int = 2,
         retry_backoff: float = 0.25,
         cache_path: str | Path | None = None,
@@ -181,7 +185,7 @@ class LLMStatsClient:
             except HTTPError as exc:
                 last_error = exc
                 if exc.code not in {429, 500, 502, 503, 504} or attempt >= self.max_retries:
-                    raise LLMStatsError(f"LLM Stats request failed with HTTP {exc.code}") from exc
+                    raise LLMStatsError(self._describe(exc)) from exc
                 self._sleep(self._retry_delay(exc, attempt))
             except (TimeoutError, URLError, json.JSONDecodeError) as exc:
                 last_error = exc
@@ -189,6 +193,39 @@ class LLMStatsClient:
                     raise LLMStatsError("LLM Stats request failed") from exc
                 self._sleep(self.retry_backoff * (2**attempt))
         raise LLMStatsError("LLM Stats request failed") from last_error
+
+    @staticmethod
+    def _describe(exc: HTTPError) -> str:
+        """Turn an HTTP failure into something the caller can act on.
+
+        This used to raise a bare `HTTP 401`, which is why a real run read the
+        code as a permission problem, gave up on routing, and hand-picked a model
+        instead. The API says exactly what is wrong and where to fix it in the
+        response body, so quote it, and name the remedy for auth codes because
+        that is the failure operators actually hit.
+        """
+
+        detail = ""
+        try:
+            body = json.loads(exc.read().decode("utf-8", "replace"))
+            error = body.get("error", body)
+            if isinstance(error, dict):
+                detail = str(error.get("message") or error.get("code") or "")
+        except Exception:
+            # A body we cannot parse must never mask the status code itself.
+            detail = ""
+        message = f"LLM Stats request failed with HTTP {exc.code}"
+        if detail:
+            message += f": {detail}"
+        if exc.code in {401, 403}:
+            message += (
+                f". {API_KEY_ENV} is set but the API rejected it, so the key is invalid,"
+                " expired, or lacks access rather than missing. Regenerate it at"
+                " https://llm-stats.com/settings?tab=api-keys and export it into the"
+                " process environment. Do not hand-pick a model to work around this;"
+                " see the degraded-routing path in the routing-plan skill."
+            )
+        return message
 
     def _retry_delay(self, exc: HTTPError, attempt: int) -> float:
         value = exc.headers.get("Retry-After")

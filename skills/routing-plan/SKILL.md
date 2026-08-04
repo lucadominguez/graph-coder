@@ -53,6 +53,25 @@ Every decision carries a `registry` report with the evidence age, the number of 
 9. Add expected and observed spend to the cumulative project ledger for all metered services, not only model tokens. Refuse a dispatch that would exceed the applicable hard cap.
 10. A manual override must still meet hard requirements. Use a force flag only with an explicit recorded warning and Director authority.
 
+## When the evidence source is unavailable
+
+LLM Stats can be down, unreachable, or reject the key. `HTTP 401` and `HTTP 403` mean the key is invalid, expired, or lacks access rather than missing, and the client now quotes the API's own message and the remedy. Fix the key first: regenerate it at `https://llm-stats.com/settings?tab=api-keys` and export it into the process environment. Auth failures on this API can take about 25 seconds to return, so a request that seems to hang is usually about to tell you something useful.
+
+If it is genuinely unavailable and no policy-valid cache exists, you may route from the harness's own model list (`swarm list_models` in JCode) instead of stopping. This is a degraded path, not an equivalent one, and it is only legitimate when it is declared:
+
+```text
+routing_evidence: harness_model_list
+benchmark_scores: unavailable
+selection_basis: availability, price, and context limits only
+confidence: low
+```
+
+Under this path the quality term has no input, so the router cannot rank on capability. Choose on the hard filters and price alone, record every candidate the harness listed, and name the model you took and why. Then surface it at full-plan approval as an explicit degradation, because the user is approving a cost estimate built on weaker evidence than the plan format implies.
+
+What makes this a failure is doing it silently. A run that hit `403`, hand-picked a cheap model, and carried on left no receipt, no candidate list, and no signal that the plan's cost figures rested on a guess. Declaring the degradation costs one paragraph and keeps the plan honest.
+
+Recover as soon as the source returns: refresh, re-assign, and record that the routes changed.
+
 ## Subscription-first eligibility
 
 Subscription-first is enforced by the router, not by prose. Never buy through a reseller a model, or a materially equivalent capability, that is already eligible through the user's direct subscription, unless the direct route is unavailable or fails a documented hard requirement.

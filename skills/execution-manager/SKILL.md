@@ -71,7 +71,8 @@ Every unit of work in this phase, first attempt and repair alike, runs inside a 
 - A `repair_required` verdict is also a spawn. Send the bounded defect and repair instructions to a worker subagent, the same worker for the first repair attempt and the fallback worker after that. A manager that applies the repair itself has ended the run's evidence trail, whatever the diff size.
 - A packet goes out verbatim. Summarizing it, merging two nodes into one spawn, or widening a scope to make the spawn simpler all void the contract the node was approved under.
 - Spawn visibly. A worker spawned headless or inline does the work and never appears in `swarm list`, which makes the status roster below unfillable: no start, no heartbeat, no elapsed time, nothing to reconcile after a reload. Every emitted task carries `spawn_mode: visible`; pass it through.
-- Completion is confirmed from the filesystem and from commands, never from waiting on a swarm report. Check that the node's write scope changed, run the unit's verification commands, and quote the real output. A worker that never joined the swarm still did its work, so absence from the roster is a monitoring gap to report, not a failure to retry.
+- Completion is confirmed from the filesystem and from commands, never from a swarm report alone. Check that the node's write scope changed, run the unit's verification commands, and quote the real output. A worker that never joined the swarm still did its work, so absence from the roster is a monitoring gap to report, not a failure to retry.
+- Watch both signals every cycle. The filesystem says whether a worker is done; `swarm status` says whether it is alive. A worker blocked on a rate limit writes nothing, which is indistinguishable from a worker that is thinking, so a filesystem-only poll cannot tell them apart. One run watched a directory for two minutes while its worker sat on a `429`.
 - If the harness exposes no way to spawn a subagent, stop and say so. Do not fall back to implementing the graph in the foreground session.
 
 ## Event loop
@@ -127,7 +128,8 @@ HUMAN-REQUIRED PACKET
 
 ## Reload and monitoring
 
-- Treat a foreground operation with no output, heartbeat, progress, or checkpoint for 30 seconds as a suspected stall. Surface it and offer bounded cancel, continue, or fallback. Do not wait minutes in silence.
+- Treat a foreground operation with no output, heartbeat, progress, or checkpoint for 30 seconds as a suspected stall. Surface it and offer bounded cancel, continue, or fallback. Do not wait minutes in silence. Detecting this requires reading the worker's health from `swarm status`, not only its output directory; a silent worker and a rate-limited one look the same on disk.
+- A rate limit (`429`) is transient infrastructure. Wait out a short `Retry-After` or take the provider-diverse fallback route, and never respawn a node whose worker is still alive, because two workers in one write scope is the write conflict the graph exists to prevent.
 - Progress and checkpoint events reset the silence timer. Background work still emitting progress is not stalled.
 - Persist dispatch, route, attempt, artifact, heartbeat, and terminal-state events before relying on them.
 - After a server reload, rebuild from the ledger and repository artifacts, compare against harness state, then resume, replace, or mark interrupted exactly once.
