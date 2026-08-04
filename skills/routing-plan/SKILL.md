@@ -55,7 +55,15 @@ Every decision carries a `registry` report with the evidence age, the number of 
 
 ## When the evidence source is unavailable
 
-LLM Stats can be down, unreachable, or reject the key. `HTTP 401` and `HTTP 403` mean the key is invalid, expired, or lacks access rather than missing, and the client now quotes the API's own message and the remedy. Fix the key first: regenerate it at `https://llm-stats.com/settings?tab=api-keys` and export it into the process environment. Auth failures on this API can take about 25 seconds to return, so a request that seems to hang is usually about to tell you something useful.
+LLM Stats can be down, unreachable, or reject the key. The client quotes the API's own message, and the two rejection codes mean different things:
+
+```text
+401  the key itself is invalid or expired      regenerate it, llm-stats.com/settings?tab=api-keys
+403  the key is valid, the account lacks       complete onboarding, llm-stats.com/developer
+     Stats API access                          a new key will not help
+```
+
+Read the code before acting. A 403 answered with a fresh key sends you in a circle, which is what happened on a real run. Auth failures on this API can take about 25 seconds to return, so a request that seems to hang is usually about to tell you something useful.
 
 If it is genuinely unavailable and no policy-valid cache exists, you may route from the harness's own model list (`swarm list_models` in JCode) instead of stopping. This is a degraded path, not an equivalent one, and it is only legitimate when it is declared:
 

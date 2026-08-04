@@ -329,8 +329,12 @@ def test_unavailable_evidence_has_a_declared_degraded_path():
     assert "routing_evidence: harness_model_list" in routing
     assert "swarm list_models" in routing
     assert "What makes this a failure is doing it silently" in routing
-    # The auth remedy, so 401/403 is not read as "routing is impossible".
-    assert "invalid, expired, or lacks access rather than missing" in routing
+    # The two rejection codes have different remedies, and confusing them is what
+    # sent a real run in a circle.
+    assert "the key itself is invalid or expired" in routing
+    assert "the account lacks" in routing
+    assert "a new key will not help" in routing
+    assert "llm-stats.com/developer" in routing
 
 
 def test_routing_phase_is_not_skippable_and_local_is_not_a_route():

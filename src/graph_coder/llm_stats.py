@@ -217,13 +217,28 @@ class LLMStatsClient:
         message = f"LLM Stats request failed with HTTP {exc.code}"
         if detail:
             message += f": {detail}"
+        # 401 and 403 mean different things here and have different remedies.
+        # Both were observed live: a 401 is a bad key, while a 403 is a good key
+        # on an account that has not been granted Stats API access. Telling a 403
+        # to regenerate its key sends the operator in a circle.
+        if exc.code == 401:
+            message += (
+                f". {API_KEY_ENV} is set but the API rejected the key itself, so it is"
+                " invalid or expired rather than missing. Regenerate it at"
+                " https://llm-stats.com/settings?tab=api-keys and export it into the"
+                " process environment."
+            )
+        elif exc.code == 403:
+            message += (
+                f". {API_KEY_ENV} is set and the key is recognized, but this account"
+                " lacks Stats API access, so a new key will not help. Complete"
+                " onboarding at https://llm-stats.com/developer and retry."
+            )
         if exc.code in {401, 403}:
             message += (
-                f". {API_KEY_ENV} is set but the API rejected it, so the key is invalid,"
-                " expired, or lacks access rather than missing. Regenerate it at"
-                " https://llm-stats.com/settings?tab=api-keys and export it into the"
-                " process environment. Do not hand-pick a model to work around this;"
-                " see the degraded-routing path in the routing-plan skill."
+                " Do not hand-pick a model to work around this; use the declared"
+                " degraded-routing path in the routing-plan skill, which records the"
+                " weaker evidence instead of hiding it."
             )
         return message
 

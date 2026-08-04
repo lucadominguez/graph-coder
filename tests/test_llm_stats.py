@@ -205,11 +205,47 @@ def test_auth_failure_quotes_the_api_message_and_names_the_remedy(
     message = str(raised.value)
     assert "HTTP 401" in message
     assert "Invalid API key" in message
-    assert "invalid, expired, or lacks access rather than missing" in message
+    assert "invalid or expired rather than missing" in message
     assert "https://llm-stats.com/settings?tab=api-keys" in message
     assert "Do not hand-pick a model" in message
     # The key itself must never reach an error string.
     assert "expired-token" not in message
+
+
+def test_forbidden_is_an_entitlement_problem_not_a_bad_key(
+    fake_server: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Observed live 2026-08-03: a valid key on an un-onboarded account returns
+    403, not 401. Telling that operator to regenerate the key sends them in a
+    circle, which is exactly what happened."""
+
+    monkeypatch.setenv("LLM_STATS_API_KEY", "valid-but-unentitled")
+    FakeStatsHandler.responses = [
+        (
+            403,
+            {},
+            {
+                "error": {
+                    "code": "onboarding_required",
+                    "message": "Stats API access requires onboarding. Complete the "
+                    "request at https://llm-stats.com/developer",
+                }
+            },
+        )
+    ]
+    client = LLMStatsClient(base_url=fake_server, max_retries=0)
+
+    with pytest.raises(LLMStatsError) as raised:
+        client.fetch_models()
+
+    message = str(raised.value)
+    assert "HTTP 403" in message
+    assert "requires onboarding" in message
+    assert "a new key will not help" in message
+    assert "https://llm-stats.com/developer" in message
+    # The 401 remedy must not appear here.
+    assert "Regenerate it at" not in message
+    assert "valid-but-unentitled" not in message
 
 
 def test_timeout_budget_outlasts_this_apis_slow_auth_failures() -> None:
