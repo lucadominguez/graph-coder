@@ -95,6 +95,17 @@ class ImplementationUnit:
     regression_proof: tuple[str, ...] = ()
     commands: tuple[str, ...] = ()
     output_artifacts: tuple[str, ...] = ()
+    #: What a valid produced artifact looks like, as checkable assertions:
+    #: required fields, non-emptiness, row-count bounds, value ranges. Without
+    #: this a data-producing unit's only gate is "the worker said it finished",
+    #: and a scraper that returns an empty list passes review.
+    output_contract: tuple[str, ...] = ()
+    #: How the unit makes progress observable and how long it may take:
+    #: `checkpoint_every`, `writes_incrementally`, `command_timeout_seconds`.
+    #: The Director's stall math needs this. A unit that writes only at the end
+    #: is not stalled when it is silent, and one that promised a write per page
+    #: is.
+    progress_contract: dict[str, Any] = field(default_factory=dict)
     risk: str = "medium"
     complexity: str = "medium"
     capability_profile: dict[str, Any] = field(default_factory=dict)
@@ -366,6 +377,8 @@ def _unit_from_mapping(item: dict[str, Any]) -> ImplementationUnit:
         regression_proof=_strings(item, "regression_proof"),
         commands=_strings(item, "commands"),
         output_artifacts=_strings(item, "output_artifacts"),
+        output_contract=_strings(item, "output_contract"),
+        progress_contract=dict(item.get("progress_contract", {})),
         risk=str(item.get("risk", "medium")),
         complexity=str(item.get("complexity", "medium")),
         capability_profile=dict(item.get("capability_profile", {})),
@@ -560,7 +573,11 @@ def collect_readiness_defects(plan: PlanDocument) -> list[str]:
             "regression proof": unit.regression_proof,
             "commands": unit.commands,
             "output artifacts": unit.output_artifacts,
-            "manager_id": (unit.manager_id,),
+            "output contract": unit.output_contract,
+            "progress contract": unit.progress_contract,
+            # Not `(unit.manager_id,)`: a one-tuple is always truthy, so wrapping a
+            # string in one made this check unable to fail.
+            "manager_id": unit.manager_id,
             "review contract": unit.review_contract,
             "context manifest": unit.context_manifest,
             "retry policy": unit.retry_policy,
@@ -570,6 +587,18 @@ def collect_readiness_defects(plan: PlanDocument) -> list[str]:
         for field_name, value in required_fields.items():
             if not value:
                 defects.append(f"unit {unit.unit_id} missing {field_name}")
+        # A progress contract that omits these is not a contract. `checkpoint_every`
+        # tells the Director whether silence is expected; `command_timeout_seconds`
+        # bounds a single command, without which a worker stuck in a long call
+        # cannot report, cannot answer, and cannot be told apart from a slow one.
+        for key in ("checkpoint_every", "command_timeout_seconds"):
+            if unit.progress_contract and key not in unit.progress_contract:
+                defects.append(f"unit {unit.unit_id} progress contract missing {key}")
+        timeout = unit.progress_contract.get("command_timeout_seconds")
+        if timeout is not None and not (isinstance(timeout, int) and timeout > 0):
+            defects.append(
+                f"unit {unit.unit_id} command_timeout_seconds must be a positive integer"
+            )
         if unit.retry_policy and unit.retry_policy.get("then") != "human_required":
             defects.append(
                 f"unit {unit.unit_id} retry policy must end in human_required, "

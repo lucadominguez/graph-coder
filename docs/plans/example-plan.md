@@ -80,6 +80,14 @@ units:
     regression_proof: [Existing rows still load through src/store/models.py after the migration]
     commands: [make migrate-test]
     output_artifacts: [migrations/002_token_revocation.sql]
+    output_contract:
+      - The up migration adds exactly revoked_at and revoked_by to api_tokens and creates token_revocations.
+      - Every pre-existing api_tokens row still selects, with revoked_at NULL.
+      - The down path leaves the schema byte-identical to 001_initial.sql.
+    progress_contract:
+      checkpoint_every: single pass, the migration file is written once
+      writes_incrementally: false
+      command_timeout_seconds: 120
     risk: high
     complexity: medium
     failure_domain: storage
@@ -131,6 +139,14 @@ units:
     regression_proof: [The existing token store suite still passes unchanged]
     commands: [pytest tests/test_token_store.py]
     output_artifacts: [src/store/tokens.py, tests/test_token_store.py]
+    output_contract:
+      - revoke() and is_revoked() are importable from src/store/tokens.py.
+      - tests/test_token_store.py contains at least one test per acceptance id and all pass.
+      - No test asserts on a hard-coded row id.
+    progress_contract:
+      checkpoint_every: each function, written before its test
+      writes_incrementally: true
+      command_timeout_seconds: 300
     risk: medium
     complexity: medium
     failure_domain: storage
@@ -181,6 +197,13 @@ units:
     regression_proof: [Existing schema tests pass unchanged]
     commands: [pytest tests/test_schema.py]
     output_artifacts: [src/api/schema.py]
+    output_contract:
+      - The revocation request and response models are importable from src/api/schema.py.
+      - Every field carries an explicit type and the response includes revoked_at.
+    progress_contract:
+      checkpoint_every: single pass, one module written once
+      writes_incrementally: false
+      command_timeout_seconds: 120
     risk: low
     complexity: low
     failure_domain: api
@@ -232,6 +255,14 @@ units:
     regression_proof: [The full route suite passes, and no existing route changes status codes]
     commands: [pytest tests/test_routes.py, pytest]
     output_artifacts: [src/api/routes.py, tests/test_routes.py]
+    output_contract:
+      - POST /tokens/{id}/revoke returns 200 on a live token and 404 on an unknown id.
+      - A second revoke of the same token is idempotent and does not create a second audit row.
+      - tests/test_routes.py covers both status paths and passes.
+    progress_contract:
+      checkpoint_every: each endpoint, written before its test
+      writes_incrementally: true
+      command_timeout_seconds: 300
     risk: medium
     complexity: medium
     failure_domain: api

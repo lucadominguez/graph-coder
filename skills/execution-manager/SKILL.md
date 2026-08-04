@@ -32,6 +32,7 @@ Review is the manager's core output. On receiving a worker report, check every o
 | Acceptance | every `acceptance_id` in the unit's `review_contract` |
 | Artifacts | `expected_artifacts`, present and hashed |
 | Scope | `changed_paths` against `write_scope` and `forbidden_scope` |
+| Output contract | every assertion in the unit's `output_contract`, checked against the artifact |
 | Verification | required commands actually run, with real output |
 | Interfaces | `interfaces.produces` and declared compatibility |
 | Deviations | anything the worker did that the plan did not say |
@@ -48,6 +49,8 @@ human_required    the unresolved question, attempts already made, impacted nodes
 ```
 
 Only `pass` moves a node from `awaiting_review` to `completed`, and only that transition makes dependents eligible. A test that passes while the write scope was violated is not a pass; report the scope violation as the defect.
+
+Check the artifact's contents, not only its existence. An empty result file, a list of zero records, or rows missing a required field all satisfy "the command ran and the file was written" while failing the unit. The `output_contract` exists so this check is mechanical rather than a matter of taste; if a unit reached you without one, that is a plan defect to escalate, not a gap for you to fill by judgment.
 
 An incomplete report cannot be reviewed. Return it for completion; never fill the gaps by inspecting the repository yourself and never guess what the worker probably did.
 

@@ -197,6 +197,12 @@ doing. Plan around it instead of retrying the call:
 
 ### When to stop waiting
 
+Read the unit's `progress_contract` first, because it says what progress should
+look like for this unit. A unit declaring `writes_incrementally: false` and
+`checkpoint_every: single pass` is not stalled when nothing appears; a unit that
+promised a write per page and has written nothing for a minute is. Judging both by
+the same timer produces false alarms on one and blindness on the other.
+
 `heartbeat_seconds` (default 300) is a declared bound that nothing enforces, so
 enforce it yourself. Measure from the last observed change, not from spawn:
 

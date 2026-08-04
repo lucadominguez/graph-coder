@@ -62,6 +62,13 @@ units:
     regression_proof: [invalid fixture fails]
     commands: [uv run pytest tests/test_contracts.py tests/test_plans.py]
     output_artifacts: [schemas/v1/plan.schema.json]
+    output_contract:
+      - The schema file parses as JSON Schema and declares required properties.
+      - A known-invalid fixture is rejected by it, so the schema is not vacuous.
+    progress_contract:
+      checkpoint_every: single pass, one schema written once
+      writes_incrementally: false
+      command_timeout_seconds: 120
     risk: medium
     complexity: medium
     failure_domain: contracts

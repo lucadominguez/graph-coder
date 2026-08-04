@@ -82,6 +82,11 @@ commands:
   red: [command that fails before the work]
   green: [command that passes after it]
 expected_artifacts: [string]
+output_contract: [checkable assertion about the artifact's content]
+progress_contract:
+  checkpoint_every: string
+  writes_incrementally: bool
+  command_timeout_seconds: int
 manager_id: M-id
 review_contract:
   acceptance_ids: [AC-id]
@@ -103,6 +108,31 @@ retry_policy:
 ```
 
 Write every unit so a weaker fresh executor can complete it without chat history. That is the whole point: detailed contracts are what make cheap workers viable.
+
+### The output contract is a gate, not a description
+
+`expected_artifacts` names the file. `output_contract` says what has to be inside it, as assertions someone else can check without trusting the worker.
+
+A unit that says "scrape the listings and submit a report" can be satisfied by a scraper that returns nothing: the code ran, the file exists, and no criterion was violated because none described the contents. State the fields that must be present, that the result must be non-empty, and the bounds a plausible result falls within.
+
+```yaml
+output_contract:
+  - Every record carries title, price, and url, all non-empty.
+  - At least 20 records, and no more than 200, from one catalogue page.
+  - No two records share a url.
+```
+
+Prefer an assertion a command can decide. If the check needs an agent to perform a concrete validation action rather than a manager reading a diff, compile a `verify` node for it. That is what `verify` is for, and it is not the reviewer role returning by the back door.
+
+### The progress contract is what makes a stall detectable
+
+A worker's transcript cannot be read while it runs, so the plan has to say in advance what progress will look like on disk. Without that, an agent 40 minutes into 1000 detail pages and an agent wedged in a dead loop are the same observation: nothing new written.
+
+- `checkpoint_every` names the cadence in the unit's own terms, such as "each detail page" or "every 25 records" or "single pass". The Director's stall math reads this: silence from a single-pass unit is expected, and silence from a per-page unit is a stall.
+- `writes_incrementally` decides whether output accumulates on disk or lands once at the end. Anything iterative or long-running should write as it goes, so a death at item 900 does not lose 900 items.
+- `command_timeout_seconds` bounds any single command. A worker inside a long blocking call cannot answer a message, cannot report to its manager, and cannot be told apart from a hung one, so the report-to-manager pattern quietly stops working. Bound the command instead of hoping it returns.
+
+Long or unbounded work gets batches with a checkpoint between them, never one command that either finishes or does not.
 
 `manager_id` replaces any notion of an independent reviewer. A unit's review is owned by its manager. Never specify a reviewer agent, a review node, or a second opinion pass beneath a worker.
 

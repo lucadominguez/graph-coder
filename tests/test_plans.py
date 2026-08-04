@@ -18,6 +18,7 @@ from graph_coder.plans import (
     approval_is_valid,
     check_maximum_reliability_gates,
     check_traceability,
+    collect_readiness_defects,
     create_snapshot,
     parse_markdown_plan,
     reconcile_completed_units,
@@ -194,3 +195,60 @@ def test_reconciliation_reopens_changed_or_invalid_completed_units() -> None:
     reconciled = reconcile_completed_units(previous, current)
     assert [unit.status for unit in reconciled] == ["reopened", "reopened"]
     assert all(unit.semantic_hash == semantic_unit_hash(unit) for unit in reconciled)
+
+
+def test_a_unit_without_an_output_contract_is_not_implementation_ready() -> None:
+    """Reported from a real run: the scraper unit was "scrape and submit report",
+    with no gate saying the output must have the right fields or any rows at all.
+    An empty result would have passed review."""
+
+    plan = parse_markdown_plan(fixture_text())
+    assert collect_readiness_defects(plan) == []
+
+    without = replace(plan, units=(replace(plan.units[0], output_contract=()),))
+    defects = collect_readiness_defects(without)
+    assert any("missing output contract" in defect for defect in defects)
+
+
+def test_a_progress_contract_must_carry_a_cadence_and_a_timeout() -> None:
+    """The cadence is what lets the Director tell a stalled worker from a quiet
+    one, and the timeout is what stops a worker vanishing into a blocking call it
+    cannot report from."""
+
+    plan = parse_markdown_plan(fixture_text())
+    unit = plan.units[0]
+
+    missing = replace(plan, units=(replace(unit, progress_contract={}),))
+    assert any("missing progress contract" in d for d in collect_readiness_defects(missing))
+
+    no_cadence = replace(
+        plan, units=(replace(unit, progress_contract={"command_timeout_seconds": 60}),)
+    )
+    assert any("missing checkpoint_every" in d for d in collect_readiness_defects(no_cadence))
+
+    no_timeout = replace(plan, units=(replace(unit, progress_contract={"checkpoint_every": "x"}),))
+    assert any(
+        "missing command_timeout_seconds" in d for d in collect_readiness_defects(no_timeout)
+    )
+
+    bad_timeout = replace(
+        plan,
+        units=(
+            replace(
+                unit, progress_contract={"checkpoint_every": "x", "command_timeout_seconds": 0}
+            ),
+        ),
+    )
+    assert any(
+        "command_timeout_seconds must be a positive integer" in d
+        for d in collect_readiness_defects(bad_timeout)
+    )
+
+
+def test_a_missing_manager_id_is_actually_caught() -> None:
+    """It was wrapped in a one-tuple, which is always truthy, so a unit with no
+    manager passed the readiness gate and reached execution with no reviewer."""
+
+    plan = parse_markdown_plan(fixture_text())
+    without = replace(plan, units=(replace(plan.units[0], manager_id=""),))
+    assert any("missing manager_id" in defect for defect in collect_readiness_defects(without))

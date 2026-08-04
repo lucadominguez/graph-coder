@@ -260,5 +260,67 @@ def test_worker_packets_require_visible_progress() -> None:
     for task in adapter.task_graph_bundle(sample_graph()).arguments["nodes"]:
         content = task["content"]
         assert f".graph-coder/progress/{task['id']}.log" in content
-        assert "create the files in your write scope early" in content
         assert "the only path outside that scope you may touch" in content
+        assert "transcript cannot be read while you run" in content
+
+
+def test_packet_progress_rules_follow_the_units_declared_contract() -> None:
+    """A single-pass unit and a per-item unit need opposite instructions, and
+    judging both by one rule produces false alarms on one and blindness on the
+    other. The cadence comes from the plan, not from a fixed default."""
+
+    graph = sample_graph()
+    for node in graph.nodes:
+        if node.id == "implement":
+            node.metadata["progress_contract"] = {
+                "checkpoint_every": "each detail page",
+                "writes_incrementally": True,
+                "command_timeout_seconds": 90,
+            }
+        if node.id == "verify":
+            node.metadata["progress_contract"] = {
+                "checkpoint_every": "single pass",
+                "writes_incrementally": False,
+                "command_timeout_seconds": 30,
+            }
+
+    tasks = {
+        task["id"]: task["content"]
+        for task in JCodeAdapter(version_output="jcode v0.55.0")
+        .task_graph_bundle(graph)
+        .arguments["nodes"]
+    }
+
+    assert "cadence: each detail page" in tasks["implement"]
+    assert "Write your output incrementally" in tasks["implement"]
+    assert "No single command may run longer than 90 seconds" in tasks["implement"]
+
+    assert "cadence: single pass" in tasks["verify"]
+    assert "writes its output once, in a single pass" in tasks["verify"]
+    assert "No single command may run longer than 30 seconds" in tasks["verify"]
+
+
+def test_packet_states_the_output_contract_as_a_gate() -> None:
+    """A unit whose only gate is acceptance prose can be satisfied by a scraper
+    that returns nothing: the code ran, the file exists, and no criterion said the
+    file had to contain anything."""
+
+    graph = sample_graph()
+    for node in graph.nodes:
+        if node.id == "implement":
+            node.metadata["output_contract"] = [
+                "Every record carries title, price, and url, all non-empty.",
+                "At least 20 records from one catalogue page.",
+            ]
+
+    tasks = {
+        task["id"]: task["content"]
+        for task in JCodeAdapter(version_output="jcode v0.55.0")
+        .task_graph_bundle(graph)
+        .arguments["nodes"]
+    }
+
+    assert "Every record carries title, price, and url" in tasks["implement"]
+    assert "A file that exists but is empty or malformed is a failure" in tasks["implement"]
+    # A unit with no declared contract is told to escalate, not to invent one.
+    assert "none declared. Escalate rather than guessing one" in tasks["explore"]

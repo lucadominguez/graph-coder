@@ -7,6 +7,34 @@ it reaches 1.0; until then, minor versions may change contracts.
 
 ### Fixed
 
+- **Units had no output gate, so an empty result passed review.** A scraper unit
+  was "scrape and submit report", with nothing saying the output needed the right
+  fields or any rows at all: the code ran, the file existed, no criterion was
+  violated, and the Director had to invent a check on the spot. Units now carry a
+  required `output_contract` of checkable assertions about the artifact's contents.
+  A plan whose units lack one is not implementation-ready and cannot reach
+  approval. The worker is told the contract before it starts, and the manager
+  review checks the artifact's contents rather than its existence.
+- **Nothing in the plan said what progress should look like.** Over a long
+  iterative job, an agent 900 items in and an agent wedged in a dead loop produce
+  the same observation, which is nothing new on disk. Units now carry a required
+  `progress_contract`: `checkpoint_every` in the unit's own terms, whether output
+  accumulates incrementally, and `command_timeout_seconds`. The packet's progress
+  instructions are generated from it, so a single-pass unit and a per-page unit get
+  opposite instructions instead of one generic rule, and the Director's stall math
+  reads the same field rather than timing every unit identically.
+- **Report-to-manager assumed a worker that can still respond.** A worker inside a
+  long blocking call cannot answer a message, cannot report, and cannot be told
+  apart from a hung one, so the whole review pattern silently stops working.
+  `command_timeout_seconds` is now required and non-optional per unit, the packet
+  instructs the worker to bound its own long commands or split them into reporting
+  batches, and plan-forge requires long work to be batched with a checkpoint
+  between rather than run as one command that either returns or does not.
+- **`manager_id` was checked with `(unit.manager_id,)`.** A one-tuple is always
+  truthy, so the check could not fail and a unit with no manager passed readiness
+  and reached execution with nobody assigned to review it. Found while adding the
+  checks above.
+
 - **The preflight named a problem it gave you no way to fix.** `jcode emit` would
   report that MODEL_ROUTING was skipped and then offer nothing to act on. A run had
   to hand-edit `graph.json`, could not, because all four nodes carry the identical

@@ -248,6 +248,27 @@ class JCodeAdapter:
             lines.append(self._unit_prompt(unit))
         return "\n".join(lines)
 
+    def output_contract(self, node: GraphNode) -> str:
+        """The checkable shape of a valid artifact, restated to the worker.
+
+        A unit whose only gate is its acceptance prose can be "completed" by a
+        scraper that returns an empty list: the code runs, the file exists, and
+        nothing says the file must contain anything. The plan now declares what
+        valid output looks like, and the worker is told before it starts.
+        """
+
+        checks = node.metadata.get("output_contract") or []
+        if not checks:
+            return "Output contract: none declared. Escalate rather than guessing one."
+        lines = ["Output contract. Your work is not done until every one of these holds:"]
+        lines.extend(f"- {check}" for check in checks)
+        lines.append(
+            "Verify these yourself against the artifact you produced, and quote the "
+            "result in your report. A file that exists but is empty or malformed is a "
+            "failure, not a completion."
+        )
+        return "\n".join(lines)
+
     def progress_protocol(self, node: GraphNode) -> str:
         """Tell the worker to make its progress visible from outside.
 
@@ -259,16 +280,41 @@ class JCodeAdapter:
         difference observable.
         """
 
-        return (
-            f"Progress protocol. Append one line to {PROGRESS_DIR}/{node.id}.log as you "
-            "start each step and as you finish it, and create the files in your write "
-            "scope early and fill them in rather than writing everything at the end. "
+        contract = node.metadata.get("progress_contract") or {}
+        cadence = str(contract.get("checkpoint_every") or "each step")
+        timeout = contract.get("command_timeout_seconds")
+        incremental = bool(contract.get("writes_incrementally", True))
+
+        lines = [
+            f"Progress protocol. Append one line to {PROGRESS_DIR}/{node.id}.log at "
+            f"this cadence: {cadence}. Writing this log is permitted despite the write "
+            "scope below, and it is the only path outside that scope you may touch.",
+        ]
+        if incremental:
+            lines.append(
+                "Write your output incrementally at that same cadence. Do not hold "
+                "results in memory and write once at the end: a long run that dies "
+                "before its final write loses everything, and until that write lands "
+                "you are indistinguishable from an agent that is stuck."
+            )
+        else:
+            lines.append(
+                "This unit writes its output once, in a single pass, so the progress "
+                "log is the only sign of life you emit. Keep it current."
+            )
+        if timeout:
+            lines.append(
+                f"No single command may run longer than {timeout} seconds. Bound long "
+                "commands yourself, with a timeout or by splitting the work into "
+                "batches that each report. A worker inside a long blocking call cannot "
+                "answer a message, cannot report, and will be cancelled as hung rather "
+                "than waited on."
+            )
+        lines.append(
             "Your transcript cannot be read while you run, so these are the only signs "
-            "you are making progress; a long silent stretch is read as a stall and may "
-            "get your attempt cancelled. Writing this log is permitted despite the "
-            "write scope below, and it is the only path outside that scope you may "
-            "touch."
+            "you are making progress, and a long silent stretch is read as a stall."
         )
+        return " ".join(lines)
 
     def report_template(self, node: GraphNode) -> str:
         acceptance = "; ".join(node.acceptance) or "No acceptance criteria supplied."
@@ -345,6 +391,7 @@ class JCodeAdapter:
                 f"Acceptance: {node.acceptance or ['<none>']}.",
                 f"Review checklist: {node.review.checklist or ['<none>']}.",
                 node.prompt,
+                self.output_contract(node),
                 self.progress_protocol(node),
                 self.report_template(node),
             ]

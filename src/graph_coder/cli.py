@@ -504,6 +504,8 @@ def _graph_from_plan(path: Path) -> ExecutionGraph:
                     "fallback_route": unit.fallback_route,
                     "escalation_conditions": list(unit.escalation_conditions),
                     "complexity": unit.complexity,
+                    "output_contract": list(unit.output_contract),
+                    "progress_contract": dict(unit.progress_contract),
                 },
             )
         )
