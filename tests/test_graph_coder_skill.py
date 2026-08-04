@@ -249,6 +249,41 @@ def test_self_implementation_is_named_as_a_failure_not_left_implied():
     assert "a confirmed way to spawn subagents in this harness" in gates
 
 
+def test_global_swarm_cleanup_is_no_longer_the_recommended_preflight():
+    """An earlier revision of this file told the Director to open every dispatch
+    with `swarm cleanup --force`. A run followed it and stopped every worker on the
+    machine, including agents belonging to unrelated projects."""
+
+    dispatch = " ".join(read("graph-coder/references/dispatch.md").split())
+    assert "Do not reach for `swarm cleanup --force` as a routine preflight" in dispatch
+    assert "including agents belonging to unrelated projects" in dispatch
+    assert "swarm list see what exists before removing anything" in dispatch
+    text = " ".join(orchestrator().split())
+    assert "Never open with `swarm cleanup --force`" in text
+
+
+def test_stall_detection_has_thresholds_and_an_exit():
+    """`heartbeat_seconds` was a declared bound that nothing enforced, and "never
+    respawn a live worker" gave no criteria for when to stop waiting. One run sat
+    on a worker for over two minutes with no way to call it."""
+
+    dispatch = read("graph-coder/references/dispatch.md")
+    assert "When to stop waiting" in dispatch
+    assert "heartbeat_seconds (300)     none       any       failed attempt" in dispatch
+    assert "This is the exception to" in dispatch
+    assert "protects a working worker, not a hung one" in dispatch
+    # Token growth without file growth is a distinct state, not a freeze.
+    assert "alive, unproductive" in dispatch
+
+
+def test_unreadable_live_transcripts_have_a_documented_workaround():
+    dispatch = read("graph-coder/references/dispatch.md")
+    assert "You cannot read a live worker's transcript" in dispatch
+    assert "returns busy while the agent is running" in dispatch
+    assert "Keep the watchers to one per round" in dispatch
+    assert "resolve on top of each other" in dispatch
+
+
 def test_dispatch_preflight_covers_the_three_observed_failures():
     """From a real run: stale swarm plans merged a 3-node graph into 55 nodes,
     phase 8 was skipped so every packet shipped model `local`, and inline spawns

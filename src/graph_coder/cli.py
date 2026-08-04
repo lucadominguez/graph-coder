@@ -9,14 +9,14 @@ import os
 import sqlite3
 import sys
 from collections.abc import Callable, Sequence
-from dataclasses import asdict, is_dataclass
+from dataclasses import asdict, is_dataclass, replace
 from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
 from typing import Any
 
 from . import __version__
-from .adapters.jcode import JCodeAdapter
+from .adapters.jcode import PLACEHOLDER_ROUTES, JCodeAdapter
 from .config import (
     DEFAULT_CONFIG_TOML,
     GraphCoderConfig,
@@ -930,6 +930,84 @@ def _cmd_context_build(args: argparse.Namespace) -> JsonObject:
     return payload
 
 
+def _cmd_route_set(args: argparse.Namespace) -> JsonObject:
+    """Write a route onto graph nodes without hand-editing the graph file.
+
+    This exists because `jcode emit` preflight could say "MODEL_ROUTING was
+    skipped" and then offer nothing to fix it with. A run had to hand-edit
+    `graph.json`, and could not, because every node carried the identical line
+    `"model": "local"` and a text edit cannot target one of three identical
+    occurrences. It wrote a throwaway Python script instead. That is a tool gap,
+    not a user error.
+
+    The evidence basis is recorded on the node, so a route set from a harness
+    model list is never mistaken later for one the router derived.
+    """
+
+    path = Path(args.graph)
+    graph = ExecutionGraph.load_json(path)
+    nodes = graph.by_id()
+
+    targets = (
+        list(args.node)
+        if args.node
+        else [
+            node.id
+            for node in graph.nodes
+            if node.id != graph.root_id
+            and node.kind != NodeKind.MANAGE
+            and (node.route.model or "") in PLACEHOLDER_ROUTES
+        ]
+    )
+    unknown = [node_id for node_id in targets if node_id not in nodes]
+    if unknown:
+        raise ContractError(f"no such node in {path}: {', '.join(sorted(unknown))}")
+    if not targets:
+        raise ContractError(
+            f"no nodes to set in {path}: name them with --node, or leave --node off "
+            "to fill every node still carrying a placeholder route"
+        )
+
+    updated: list[dict[str, Any]] = []
+    for node_id in targets:
+        node = nodes[node_id]
+        previous = node.route.model
+        node.route = replace(
+            node.route,
+            model=args.model,
+            spawn_mode=node.route.spawn_mode or "visible",
+        )
+        node.metadata["route_evidence"] = args.evidence
+        if args.fallback:
+            node.metadata["fallback_route"] = args.fallback
+        updated.append(
+            {
+                "node_id": node_id,
+                "previous_model": previous,
+                "model": args.model,
+                "fallback_route": node.metadata.get("fallback_route"),
+                "route_evidence": args.evidence,
+            }
+        )
+
+    graph.validate()
+    graph.dump_json(path)
+    payload: JsonObject = {
+        "ok": True,
+        "graph": str(path),
+        "updated": updated,
+        "route_evidence": args.evidence,
+    }
+    if args.evidence != "llm_stats":
+        payload["degraded"] = (
+            f"routes were set from `{args.evidence}`, not from a router decision over "
+            "refreshed LLM Stats evidence. There is no benchmark score behind these "
+            "choices, so record the basis in the plan and surface the degradation at "
+            "approval rather than presenting them as routed."
+        )
+    return payload
+
+
 def _cmd_jcode_emit(args: argparse.Namespace) -> JsonObject:
     graph = ExecutionGraph.load_json(args.graph)
     adapter = JCodeAdapter()
@@ -1020,6 +1098,26 @@ def build_parser() -> argparse.ArgumentParser:
     refresh.add_argument("--base-url", default=DEFAULT_API_BASE)
     refresh.add_argument("--max-age-hours", type=float, default=24.0)
     _set_handler(refresh, _cmd_route_refresh)
+
+    route_set = route.add_parser(
+        "set", help="write a route onto graph nodes without editing the graph by hand"
+    )
+    route_set.add_argument("--graph", required=True)
+    route_set.add_argument(
+        "--node",
+        action="append",
+        help="node id to set; repeatable. Omit to fill every node still carrying a "
+        "placeholder route.",
+    )
+    route_set.add_argument("--model", required=True)
+    route_set.add_argument("--fallback", help="fallback model recorded for retry")
+    route_set.add_argument(
+        "--evidence",
+        default="harness_model_list",
+        choices=["harness_model_list", "operator", "llm_stats"],
+        help="what the choice rests on; anything but llm_stats is recorded as degraded",
+    )
+    _set_handler(route_set, _cmd_route_set)
     for name, handler in (("assign", _cmd_route_assign), ("explain", _cmd_route_explain)):
         command = route.add_parser(name)
         command.add_argument("--input", required=True)

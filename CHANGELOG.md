@@ -7,6 +7,42 @@ it reaches 1.0; until then, minor versions may change contracts.
 
 ### Fixed
 
+- **The preflight named a problem it gave you no way to fix.** `jcode emit` would
+  report that MODEL_ROUTING was skipped and then offer nothing to act on. A run had
+  to hand-edit `graph.json`, could not, because all four nodes carry the identical
+  line `"model": "local"` and a text edit cannot target one of four identical
+  occurrences, and wrote a throwaway script instead. `graph-coder route set` now
+  writes routes onto nodes: with `--node` it sets exactly those, without it fills
+  every node still holding a placeholder. It records `route_evidence` per node and
+  returns a `degraded` notice when the basis is not LLM Stats, so a harness-list
+  choice is never later mistaken for a router decision.
+- **The fallback route was compiled and then dropped.** `fallback_route` sat in node
+  metadata and never reached the emitted task, so retrying on the fallback meant
+  re-deriving the model by hand mid-run. Tasks now carry `fallback_model` beside
+  `model`, and a placeholder is withheld rather than offered as a fallback.
+- **`swarm cleanup --force` was recommended as a routine preflight, and it is
+  global.** A run followed that advice and stopped every worker on the machine,
+  including agents belonging to unrelated projects. That instruction was added here
+  and is now withdrawn: inspect with `swarm list`, remove stale nodes by id, and
+  treat the global cleanup as a last resort only after confirming no unrelated
+  agent is running. When the removal cannot be scoped, dispatch per node with
+  `swarm spawn`, which needs no clean plan registry.
+- **Stall detection had no threshold and no exit.** `heartbeat_seconds` was a
+  declared bound that nothing enforced, and "never respawn a live worker" gave no
+  criteria for when to stop waiting, so a run sat on a stuck worker for over two
+  minutes. Dispatch now carries a table keyed on time since the last observed
+  change, separating a worker that is alive but unproductive (tokens growing, no
+  files) from one that is frozen, and crossing `heartbeat_seconds` ends the wait:
+  count the attempt, take the fallback, escalate. The no-respawn rule protects a
+  working worker, not a hung one.
+- **A running worker's transcript cannot be read at all**, since
+  `swarm read_context` returns busy and `session_search` returns metadata only.
+  Worker packets now carry a progress protocol requiring a per-node log line at
+  each step and early creation of output files, so the filesystem shows the
+  progress the transcript will not. Watchers are now one per round rather than one
+  per node, because overlapping `await_members` calls resolve on top of each other
+  and bury the event that mattered.
+
 - **Execution now tells the Director to spawn, in so many words.** A real run
   reached `DIRECTED_EXECUTION` and the root session implemented the plan itself
   instead of dispatching workers. Nothing in the skills was wrong, and nothing in

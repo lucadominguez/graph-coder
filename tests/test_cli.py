@@ -264,3 +264,148 @@ def test_shipped_example_plan_validates_and_compiles(tmp_path, capsys) -> None:
     # produce, or it refuses on evidence rather than demonstrating a route.
     request = json.loads(route_request.read_text(encoding="utf-8"))
     assert set(request["task"]["required_tools"]) <= {"edit", "bash", "read"}
+
+
+def test_route_set_fixes_placeholder_routes_without_hand_editing(tmp_path, capsys) -> None:
+    """The gap this closes: preflight said MODEL_ROUTING was skipped and offered no
+    way to fix it. A run had to hand-edit graph.json, could not target one of three
+    identical `"model": "local"` lines with a text edit, and wrote a throwaway
+    script instead."""
+
+    repository_root = Path(__file__).resolve().parent.parent
+    plan_path = repository_root / "docs" / "plans" / "example-plan.md"
+    graph_path = tmp_path / "graph.json"
+
+    assert main(["--root", str(tmp_path), "init"]) == 0
+    capsys.readouterr()
+    assert (
+        main(
+            [
+                "--root",
+                str(tmp_path),
+                "graph",
+                "compile",
+                "--plan",
+                str(plan_path),
+                "--output",
+                str(graph_path),
+            ]
+        )
+        == 0
+    )
+    capsys.readouterr()
+
+    # Before: every node unrouted, so dispatch is refused.
+    assert main(["--root", str(tmp_path), "jcode", "emit", "--graph", str(graph_path)]) == 0
+    before = json.loads(capsys.readouterr().out)["preflight"]
+    assert before["ready_to_dispatch"] is False
+    assert len(before["unrouted_nodes"]) == 4
+
+    # One command fills every placeholder, which a text edit could not do.
+    assert (
+        main(
+            [
+                "--root",
+                str(tmp_path),
+                "route",
+                "set",
+                "--graph",
+                str(graph_path),
+                "--model",
+                "qwen/qwen3.7-flash",
+                "--fallback",
+                "google:gemini-3-flash-preview",
+            ]
+        )
+        == 0
+    )
+    result = json.loads(capsys.readouterr().out)
+    assert {entry["node_id"] for entry in result["updated"]} == set(before["unrouted_nodes"])
+    assert all(entry["previous_model"] == "local" for entry in result["updated"])
+    # Degraded evidence is recorded, never passed off as a router decision.
+    assert result["route_evidence"] == "harness_model_list"
+    assert "not from a router decision" in result["degraded"]
+
+    # After: dispatchable, with the fallback carried through to the packet.
+    assert main(["--root", str(tmp_path), "jcode", "emit", "--graph", str(graph_path)]) == 0
+    emitted = json.loads(capsys.readouterr().out)
+    assert emitted["preflight"]["ready_to_dispatch"] is True
+    assert emitted["preflight"]["unrouted_nodes"] == []
+    for task in emitted["operations"][0]["arguments"]["nodes"]:
+        assert task["model"] == "qwen/qwen3.7-flash"
+        assert task["fallback_model"] == "google:gemini-3-flash-preview"
+
+
+def test_route_set_targets_one_node_and_refuses_unknown_ids(tmp_path, capsys) -> None:
+    repository_root = Path(__file__).resolve().parent.parent
+    plan_path = repository_root / "docs" / "plans" / "example-plan.md"
+    graph_path = tmp_path / "graph.json"
+
+    assert main(["--root", str(tmp_path), "init"]) == 0
+    assert (
+        main(
+            [
+                "--root",
+                str(tmp_path),
+                "graph",
+                "compile",
+                "--plan",
+                str(plan_path),
+                "--output",
+                str(graph_path),
+            ]
+        )
+        == 0
+    )
+    capsys.readouterr()
+
+    assert (
+        main(
+            [
+                "--root",
+                str(tmp_path),
+                "route",
+                "set",
+                "--graph",
+                str(graph_path),
+                "--node",
+                "IU-STORE",
+                "--model",
+                "anthropic:claude-sonnet-5",
+                "--evidence",
+                "operator",
+            ]
+        )
+        == 0
+    )
+    updated = json.loads(capsys.readouterr().out)["updated"]
+    assert [entry["node_id"] for entry in updated] == ["IU-STORE"]
+
+    # The other three keep their placeholder, so the fix stays scoped.
+    assert main(["--root", str(tmp_path), "jcode", "emit", "--graph", str(graph_path)]) == 0
+    assert json.loads(capsys.readouterr().out)["preflight"]["unrouted_nodes"] == [
+        "IU-ENDPOINT",
+        "IU-MIGRATION",
+        "IU-SCHEMA",
+    ]
+
+    assert (
+        main(
+            [
+                "--root",
+                str(tmp_path),
+                "route",
+                "set",
+                "--graph",
+                str(graph_path),
+                "--node",
+                "IU-NOPE",
+                "--model",
+                "anthropic:claude-sonnet-5",
+            ]
+        )
+        == 2
+    )
+    refusal = json.loads(capsys.readouterr().out)
+    assert refusal["ok"] is False
+    assert "no such node" in refusal["message"]

@@ -171,7 +171,7 @@ You are the Director, and the restriction is the entire point of the role: you s
 
 Dispatch each round like this. The full worked recipe, including the shape of the emitted packet, is in `references/dispatch.md`.
 
-0. Preflight. Run `swarm cleanup --force` to clear plan nodes left by earlier sessions, which otherwise merge into yours and produce a graph many times the size of the one you compiled. Then read the `preflight` block that `graph-coder jcode emit` returns and stop unless `ready_to_dispatch` is true. It fails when a node still carries the placeholder route `local`, which means phase 8 was skipped and the workers will run on whatever default the harness supplies, and when a node would spawn without `spawn_mode: visible`, which does the work invisibly, absent from `swarm list`, leaving you a status roster you cannot honestly fill in.
+0. Preflight. Check the swarm for plan nodes left by earlier sessions, which otherwise merge into yours and produce a graph many times the size of the one you compiled. Remove those nodes by id. Never open with `swarm cleanup --force`: it is global, and a run that followed that advice stopped every worker on the machine including unrelated projects' agents. Then read the `preflight` block that `graph-coder jcode emit` returns and stop unless `ready_to_dispatch` is true. It fails when a node still carries the placeholder route `local`, which means phase 8 was skipped and the workers will run on whatever default the harness supplies, and when a node would spawn without `spawn_mode: visible`, which does the work invisibly, absent from `swarm list`, leaving you a status roster you cannot honestly fill in.
 1. `graph-coder run status` gives the current frontier: every node whose dependencies all reached `completed` through a passing review.
 2. `graph-coder jcode emit --graph <graph>` gives the packets. Its `task_graph` operation carries one entry per dispatchable node, and each entry's `content` is that node's worker packet, already bounded to its read, write, and forbidden scopes. The Director and the managers are excluded from that list by construction, so everything the emit returns is meant to be spawned.
 3. Spawn one subagent per ready node with whatever subagent tool the harness exposes. In JCode that is one `swarm spawn` per node, carrying the node's `content` verbatim as the prompt, its `id` as the label, its routed model, and `--spawn_mode visible`. Issue the whole round in one message. The emitted `run_plan` batch path exists but is brittle, having failed on both stale plan pollution and coordinator assignment errors; when it errors, fall back to per-node spawns rather than debugging it. Do not paraphrase a packet, do not merge two nodes into one spawn, and do not widen a scope to make a spawn simpler.
@@ -276,6 +276,7 @@ graph-coder plan status|validate|snapshot|reconcile --file <plan>
 graph-coder graph compile --plan <plan> --output <graph>
 graph-coder graph validate --file <graph>
 graph-coder route refresh|assign|explain
+graph-coder route set --graph <graph> [--node <id>] --model <model> [--fallback <model>] [--evidence <source>]
 graph-coder event append --type <event> --payload <json> --role <role>
 graph-coder run status|recover|resume
 graph-coder context build --role <director|manager|worker>

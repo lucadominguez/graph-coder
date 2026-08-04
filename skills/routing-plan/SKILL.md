@@ -76,6 +76,15 @@ confidence: low
 
 Under this path the quality term has no input, so the router cannot rank on capability. Choose on the hard filters and price alone, record every candidate the harness listed, and name the model you took and why. Then surface it at full-plan approval as an explicit degradation, because the user is approving a cost estimate built on weaker evidence than the plan format implies.
 
+Write the result with `route set`, never by editing the graph file:
+
+```text
+graph-coder route set --graph <graph> --model <model> --fallback <model> --evidence harness_model_list
+graph-coder route set --graph <graph> --node IU-STORE --model <model> --evidence operator
+```
+
+With no `--node` it fills every node still carrying a placeholder; with `--node` it sets exactly those. It records `route_evidence` per node, so a harness-list choice is never later mistaken for a router decision, and it returns a `degraded` notice you are expected to carry into the plan. Hand-editing the graph is not the fallback for this: every unrouted node holds the identical line `"model": "local"`, so a text edit cannot target one of them, and a run that tried ended up writing a throwaway script.
+
 What makes this a failure is doing it silently. A run that hit `403`, hand-picked a cheap model, and carried on left no receipt, no candidate list, and no signal that the plan's cost figures rested on a guess. Declaring the degradation costs one paragraph and keeps the plan honest.
 
 Recover as soon as the source returns: refresh, re-assign, and record that the routes changed.

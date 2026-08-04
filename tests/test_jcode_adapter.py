@@ -224,3 +224,41 @@ def test_adapter_source_has_no_private_socket_dependency() -> None:
     assert "websocket" not in source
     assert "unix socket" not in source
     assert "named pipe" not in source
+
+
+def test_fallback_route_reaches_the_emitted_task() -> None:
+    """It was compiled into node metadata and then never emitted, so a retry meant
+    re-deriving the model by hand. Surfaced next to `model` so "respawn with the
+    fallback" needs no lookup."""
+
+    graph = sample_graph(model="qwen/qwen3.7-flash")
+    for node in graph.nodes:
+        if node.id == "implement":
+            node.metadata["fallback_route"] = "google:gemini-3-flash-preview"
+        if node.id == "verify":
+            node.metadata["fallback_route"] = "local"
+
+    tasks = {
+        task["id"]: task
+        for task in JCodeAdapter(version_output="jcode v0.55.0")
+        .task_graph_bundle(graph)
+        .arguments["nodes"]
+    }
+
+    assert tasks["implement"]["fallback_model"] == "google:gemini-3-flash-preview"
+    # A placeholder is not a fallback, so it is withheld rather than offered.
+    assert "fallback_model" not in tasks["verify"]
+    assert "fallback_model" not in tasks["explore"]
+
+
+def test_worker_packets_require_visible_progress() -> None:
+    """A running worker's transcript cannot be read, so the filesystem is the only
+    progress signal. A worker that buffers output to the end looks identical to one
+    that is stuck, which cost a real run two minutes."""
+
+    adapter = JCodeAdapter(version_output="jcode v0.55.0")
+    for task in adapter.task_graph_bundle(sample_graph()).arguments["nodes"]:
+        content = task["content"]
+        assert f".graph-coder/progress/{task['id']}.log" in content
+        assert "create the files in your write scope early" in content
+        assert "the only path outside that scope you may touch" in content

@@ -27,6 +27,11 @@ TARGET_VERSION = "0.55.0"
 #: plan carries so it can compile without network evidence; it is not a model, and
 #: a graph still holding one at dispatch time did not run MODEL_ROUTING.
 PLACEHOLDER_ROUTES = frozenset({"local", "default", "", "tbd"})
+
+#: Where workers append progress lines. It sits under the Graph Coder state
+#: directory rather than in any unit's write scope, so a worker logging progress
+#: never collides with another worker's files.
+PROGRESS_DIR = ".graph-coder/progress"
 SUPPORTED_CAPABILITIES = {
     "task_graph",
     "run_plan",
@@ -243,6 +248,28 @@ class JCodeAdapter:
             lines.append(self._unit_prompt(unit))
         return "\n".join(lines)
 
+    def progress_protocol(self, node: GraphNode) -> str:
+        """Tell the worker to make its progress visible from outside.
+
+        A running worker's transcript cannot be read: `swarm read_context` returns
+        busy and `session_search` gives metadata only. So the Director watching a
+        worker has the filesystem and nothing else, and a worker that buffers all
+        its output to the end is indistinguishable from one that is stuck. A run
+        lost two minutes to exactly that. Incremental writes are what make the
+        difference observable.
+        """
+
+        return (
+            f"Progress protocol. Append one line to {PROGRESS_DIR}/{node.id}.log as you "
+            "start each step and as you finish it, and create the files in your write "
+            "scope early and fill them in rather than writing everything at the end. "
+            "Your transcript cannot be read while you run, so these are the only signs "
+            "you are making progress; a long silent stretch is read as a stall and may "
+            "get your attempt cancelled. Writing this log is permitted despite the "
+            "write scope below, and it is the only path outside that scope you may "
+            "touch."
+        )
+
     def report_template(self, node: GraphNode) -> str:
         acceptance = "; ".join(node.acceptance) or "No acceptance criteria supplied."
         review = "; ".join(node.review.checklist) or "No review checklist supplied."
@@ -291,6 +318,12 @@ class JCodeAdapter:
         # run invisibly: no `swarm list` entry, nothing to monitor, nothing to
         # reconcile after a reload.
         task["spawn_mode"] = node.route.spawn_mode or "visible"
+        # The fallback was compiled into node metadata and then never emitted, so
+        # a retry meant re-deriving the model by hand. Surfaced at the top level
+        # next to `model` so "respawn with the fallback" needs no lookup.
+        fallback = node.metadata.get("fallback_route")
+        if fallback and str(fallback) not in PLACEHOLDER_ROUTES:
+            task["fallback_model"] = str(fallback)
         if node.role == NodeRole.COMPOSITE and node.children:
             task["children"] = list(node.children)
         return task
@@ -312,6 +345,7 @@ class JCodeAdapter:
                 f"Acceptance: {node.acceptance or ['<none>']}.",
                 f"Review checklist: {node.review.checklist or ['<none>']}.",
                 node.prompt,
+                self.progress_protocol(node),
                 self.report_template(node),
             ]
         )

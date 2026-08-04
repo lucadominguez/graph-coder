@@ -28,17 +28,41 @@ emit` returns a `preflight` block:
 `ready_to_dispatch: false` means the graph will run, but not the run that was
 approved. Fix what the warnings name and re-emit. Do not dispatch past it.
 
-1. **Clear stale swarm state.** `swarm cleanup --force`. Plan nodes from an earlier
-   session survive in the swarm and merge into yours: one run emitted a 3-node
-   graph and got a 55-node plan. If a task graph comes back with more nodes than
-   your graph has, that is what happened. Clean and re-emit; do not try to pick
-   your nodes out of the merged plan.
+1. **Check for stale swarm state, and clean it narrowly.** Plan nodes from an
+   earlier session survive in the swarm and merge into yours: one run emitted a
+   3-node graph and got a 55-node plan. If a task graph comes back with more nodes
+   than your graph has, that is what happened.
+
+   **Do not reach for `swarm cleanup --force` as a routine preflight.** An earlier
+   version of this file told you to, and a run followed it and stopped every worker
+   on the machine, including agents belonging to unrelated projects. It is global,
+   it does not scope to your graph, and other people's work is not yours to kill.
+
+   ```text
+   swarm list                     see what exists before removing anything
+   remove the stale nodes         by id, the ones that are not in your graph
+   swarm cleanup --force          last resort, and only when you have confirmed
+                                  no unrelated agent is running
+   ```
+
+   If you cannot scope the removal and unrelated agents are live, leave the swarm
+   alone and dispatch per node with `swarm spawn` instead, which does not depend on
+   a clean plan registry. Say that you did so and why.
 2. **Confirm routing actually ran.** Every node's `model` must name a real routed
    model. `local` is the example plan's compile placeholder, not a route. If you
    see `model: "local"` in the emitted packets, phase 8 was skipped and the workers
    will silently run on whatever default the harness hands them, which is the exact
    outcome the cost model exists to prevent. Go back and run `route refresh` then
-   `route assign`.
+   `route assign`. If the evidence source is unreachable, take the declared degraded
+   path and write the routes with `route set`, which fills every placeholder in one
+   call and records the weaker basis. Never hand-edit the graph to do this: every
+   unrouted node holds the identical line `"model": "local"`, so a text edit cannot
+   target one of them.
+
+   ```text
+   graph-coder route set --graph <graph> --model <model> --fallback <model> \
+     --evidence harness_model_list
+   ```
 3. **Confirm spawn visibility.** Every emitted task carries `spawn_mode`. It must be
    `visible`. A worker spawned inline or headless does the work but never appears in
    `swarm list`, so the Director cannot see it start, stall, or finish, and the
@@ -155,6 +179,52 @@ Each monitoring cycle, check both: the write scope for progress, and `swarm stat
 in `execution-manager` is asking you to detect, and it is only detectable if you
 look at the health signal. Progress on either axis resets the timer.
 
+### You cannot read a live worker's transcript
+
+`swarm read_context` returns busy while the agent is running, and `session_search`
+returns metadata only. So there is no way to see what a running worker is actually
+doing. Plan around it instead of retrying the call:
+
+- Worker packets require incremental writes and a progress log, so the filesystem
+  carries the progress the transcript will not. A worker that creates its output
+  file early and appends to it is legible from outside; one that buffers everything
+  and writes at the end is indistinguishable from one that is stuck.
+- Token growth without file growth is its own signal: the worker is alive and
+  producing, but nothing has landed. That is the shape of a loop or an
+  over-long preamble, not a freeze.
+- If you need to know what a worker did, that is what its report and its artifacts
+  are for. Wait for the terminal state rather than trying to watch.
+
+### When to stop waiting
+
+`heartbeat_seconds` (default 300) is a declared bound that nothing enforces, so
+enforce it yourself. Measure from the last observed change, not from spawn:
+
+```text
+elapsed since last change   files      tokens    read as             do
+under 60s                   any        any       working             wait
+60s                         none       growing   alive, unproductive probe: swarm status
+120s                        none       growing   suspected loop      surface options
+120s                        none       none      suspected freeze    surface options
+heartbeat_seconds (300)     none       any       failed attempt      count it, escalate
+```
+
+Crossing the heartbeat bound ends the wait. Count it against `max_attempts`, take
+the fallback route, and follow the escalation ladder. This is the exception to
+"never respawn a live worker": past its declared heartbeat the worker is not
+healthy, it is hung, and the ladder exists for exactly this. Stop it before
+spawning its replacement, so two agents never share a write scope.
+
+Never sit in an unbounded wait because the rule said not to respawn. The rule
+protects a working worker, not a hung one.
+
+### Keep the watchers to one per round
+
+Do not open a background watcher per node. Overlapping `await_members` calls
+resolve on top of each other and report the same completions more than once, which
+buries the one event that mattered. Open one watcher for the round, keyed to the
+frontier you dispatched, and reconcile against the ledger when it resolves.
+
 Classify what the health signal shows before reacting:
 
 - **rate limited (`429`)**: transient infrastructure, never model incapability. Wait
@@ -196,6 +266,11 @@ overflow = queued, not dropped, not serialized by preference
   makes dependents eligible.
 - Repairs are spawns too: a bounded repair goes to a worker subagent, never to the
   manager and never to the Director.
+- Retrying on the fallback needs no lookup. Each task carries `fallback_model`
+  beside `model`, so a fallback attempt is the same spawn with that value
+  substituted. Do not re-derive a fallback by judgment while a run is in flight;
+  if the field is absent, the graph declared no fallback and that is an escalation,
+  not an invitation to pick one.
 
 ## Self-check
 
