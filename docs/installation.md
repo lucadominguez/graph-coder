@@ -47,6 +47,24 @@ Both installers also accept an explicit project root and destination:
 powershell -File scripts/install.ps1 -ProjectRoot <path> -Dest <dir>
 ```
 
+## Retired skills
+
+Installing copies the eight active skills and deletes nothing, so a destination
+that predates a rename keeps the old skill alongside its replacement. Both names
+then describe the same phase and a run can select the retired one, which is how
+a working directory can stay out of date without any error. `aps-plan` was
+replaced by `graph-coder`, and `idea-grill` by `concept-grill`.
+
+Every install warns when it finds one. Remove them with:
+
+```sh
+./scripts/install.sh --remove-retired
+powershell -File scripts/install.ps1 -RemoveRetired
+```
+
+Combine with `--dry-run` / `-DryRun` to see what would be deleted first. Nothing
+is removed unless the flag is passed.
+
 ## Security notes
 
 - No installer reads or writes secrets, and the `graph-coder` CLI never persists provider credentials.

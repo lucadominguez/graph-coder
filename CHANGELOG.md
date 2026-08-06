@@ -7,6 +7,21 @@ it reaches 1.0; until then, minor versions may change contracts.
 
 ### Fixed
 
+- **A retired skill sat in the live install for a week and nothing said so.**
+  Installing copies the eight active skills and deletes nothing, so `idea-grill`
+  stayed in `~/.jcode/skills` next to the `concept-grill` that replaced it, still
+  advertising itself as the way to turn a rough idea into a Product Contract. Both
+  names described the same phase, a run could select either, and the installer
+  reported success every time. Both installers now check the destination for
+  retired skills, name the replacement each one shadows, and refuse to be silent
+  about it. `--remove-retired` / `-RemoveRetired` deletes them; without the flag
+  nothing is removed, so the copy-only contract still holds.
+- **`install.sh` treated `C:/...` as a relative path.** A drive-letter destination
+  fell through to the relative branch, so the skills were copied to a nested
+  folder inside the repository while the command reported that it had installed
+  them where you asked. Found by the first behavioral test written against the
+  installer, which until now was only checked by reading its text.
+
 - **Units had no output gate, so an empty result passed review.** A scraper unit
   was "scrape and submit report", with nothing saying the output needed the right
   fields or any rows at all: the code ran, the file existed, no criterion was
